@@ -39,6 +39,7 @@ public sealed class ReviewerHostedService(
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         using var scope = logger.BeginScope("PR:{Project}/{Repo}#{PR}", _options.AdoProject, _options.AdoRepoId ?? _options.AdoRepoName, _options.AdoPullRequestId);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             logger.LogInformation("Starting AI PR review (DryRun: {DryRun})", _options.DryRun);
@@ -49,6 +50,8 @@ public sealed class ReviewerHostedService(
 
             var iteration = pr.LatestIteration;
             var diffs = await diffService.GetDiffsAsync(pr, iteration, cancellationToken);
+            
+            logger.LogInformation("PR has {CommitCount} commits, {FileCount} files to review", pr.Commits.Count, diffs.Count);
 
             var reviewResult = await planner.PlanAsync(pr, iteration, diffs, policy, cancellationToken);
 
@@ -62,7 +65,8 @@ public sealed class ReviewerHostedService(
                 logger.LogWarning("DRY_RUN enabled: reporting issues without posting to Azure DevOps");
             }
 
-            logger.LogInformation("AI review completed with {ErrorCount} errors, {WarningCount} warnings", reviewResult.ErrorCount, reviewResult.WarningCount);
+            stopwatch.Stop();
+            logger.LogInformation("Review completed in {ElapsedSeconds:F1}s - {TotalIssues} total issues ({Errors} errors, {Warnings} warnings, ShouldApprove: {ShouldApprove})", stopwatch.Elapsed.TotalSeconds, reviewResult.Issues.Count, reviewResult.ErrorCount, reviewResult.WarningCount, reviewResult.ShouldApprove);
         }
         catch (Exception ex)
         {

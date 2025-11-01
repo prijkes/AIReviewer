@@ -94,6 +94,16 @@ public sealed class ReviewerOptions
     public int WarnBudget { get; set; } = 3;
 
     /// <summary>
+    /// Maximum number of files to review in a single PR. Default is 50.
+    /// </summary>
+    public int MaxFilesToReview { get; set; } = 50;
+
+    /// <summary>
+    /// Maximum number of issues to report per file. Default is 5.
+    /// </summary>
+    public int MaxIssuesPerFile { get; set; } = 5;
+
+    /// <summary>
     /// Path to the review policy markdown file. Default is "./policy/review-policy.md".
     /// </summary>
     public string PolicyPath { get; set; } = "./policy/review-policy.md";

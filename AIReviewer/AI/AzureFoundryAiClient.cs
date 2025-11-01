@@ -55,6 +55,10 @@ public sealed class AzureFoundryAiClient : IAiClient
     /// <inheritdoc/>
     public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, CancellationToken cancellationToken)
     {
+        _logger.LogDebug("Requesting AI review for {Path} ({DiffSize} bytes)",
+            fileDiff.Path, fileDiff.DiffText.Length);
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var prompt = CreateUserPrompt(fileDiff);
         var systemPrompt = $"{SystemPrompt}\n\nPolicy:\n{policy}";
         
@@ -80,8 +84,22 @@ public sealed class AzureFoundryAiClient : IAiClient
         var completion = await chatClient.CompleteChatAsync(messages, options, cancellationToken);
         var content = completion.Value.Content[0].Text;
         
-        _logger.LogInformation("AI response size {Size} bytes", content.Length);
-        return ParseResponse(content);
+        stopwatch.Stop();
+        var response = ParseResponse(content);
+        
+        _logger.LogInformation("AI reviewed {Path}: {IssueCount} issues found in {Ms}ms (response: {Size} bytes)",
+            fileDiff.Path, response.Issues.Count, stopwatch.ElapsedMilliseconds, content.Length);
+
+        // Log token usage if available
+        if (completion.Value.Usage != null)
+        {
+            _logger.LogInformation("Token usage - Input: {InputTokens}, Output: {OutputTokens}, Total: {TotalTokens}",
+                completion.Value.Usage.InputTokenCount,
+                completion.Value.Usage.OutputTokenCount,
+                completion.Value.Usage.TotalTokenCount);
+        }
+
+        return response;
     }
 
     /// <inheritdoc/>

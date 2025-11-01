@@ -59,7 +59,12 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     {
         var issues = new List<ReviewIssue>();
 
-        foreach (var diff in diffs.Take(50))
+        if (diffs.Count > _options.MaxFilesToReview)
+        {
+            logger.LogWarning("PR has {TotalFiles} files, reviewing first {MaxFiles} only", diffs.Count, _options.MaxFilesToReview);
+        }
+
+        foreach (var diff in diffs.Take(_options.MaxFilesToReview))
         {
             if (diff.DiffText.Length > _options.MaxDiffBytes)
             {
@@ -68,7 +73,14 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
             }
 
             var aiResponse = await aiClient.ReviewAsync(policy, diff, cancellationToken);
-            foreach (var issue in aiResponse.Issues.Take(5))
+            
+            if (aiResponse.Issues.Count > _options.MaxIssuesPerFile)
+            {
+                logger.LogWarning("File {Path} has {TotalIssues} issues, reporting first {MaxIssues} only", 
+                    diff.Path, aiResponse.Issues.Count, _options.MaxIssuesPerFile);
+            }
+
+            foreach (var issue in aiResponse.Issues.Take(_options.MaxIssuesPerFile))
             {
                 var fingerprint = ComputeFingerprint(diff, iteration.Id ?? 0, issue);
                 issues.Add(new ReviewIssue

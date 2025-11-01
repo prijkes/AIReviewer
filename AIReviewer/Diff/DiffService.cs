@@ -61,16 +61,23 @@ public sealed class DiffService(ILogger<DiffService> logger, AdoSdkClient adoCli
             // Get the diff text for this change
             var textDiff = change.ChangeTrackingId.ToString();
 
-            var trimmedDiff = textDiff.Length > _options.MaxDiffBytes
-                ? textDiff[.._options.MaxDiffBytes]
-                : textDiff;
+            // Truncate if needed and log
+            var trimmedDiff = textDiff;
+            if (textDiff.Length > _options.MaxDiffBytes)
+            {
+                trimmedDiff = textDiff[.._options.MaxDiffBytes];
+                logger.LogWarning("Truncating large diff for {Path} ({Original} bytes -> {Truncated} bytes)",
+                    path, textDiff.Length, _options.MaxDiffBytes);
+            }
 
             var fileHash = Logging.HashSha256($"{iterationId}:{path}:{trimmedDiff}");
 
             diffs.Add(new ReviewFileDiff(path, trimmedDiff, fileHash, false));
         }
 
-        logger.LogInformation("Prepared {Count} diffs for iteration {IterationId}", diffs.Count, iterationId);
+        var totalBytes = diffs.Sum(d => d.DiffText.Length);
+        logger.LogInformation("Prepared {Count} diffs for iteration {IterationId} (total: {TotalBytes} bytes)",
+            diffs.Count, iterationId, totalBytes);
         return diffs;
     }
 }
