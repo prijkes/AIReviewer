@@ -7,7 +7,6 @@ pr:
 
 variables:
   DOTNET_VERSION: '8.0.x'
-  CONTAINER_IMAGE: 'mcr.microsoft.com/dotnet/sdk:8.0-windowsservercore-ltsc2022'
   DRY_RUN: 'false'
 
 stages:
@@ -36,27 +35,71 @@ stages:
             env:
               ENV_FILE_CONTENT: '$(ENV_FILE_CONTENT)'
 
-          - script: |
-              docker run --rm `
-                --env-file "$(Build.SourcesDirectory)\secrets\.env" `
-                -e ADO_ACCESS_TOKEN="$(System.AccessToken)" `
-                -e DRY_RUN="$(DRY_RUN)" `
-                -e REVIEW_SCOPE="$(REVIEW_SCOPE)" `
-                -e ADO_COLLECTION_URL="$(System.CollectionUri)" `
-                -e ADO_PROJECT="$(System.TeamProject)" `
-                -e ADO_REPO_ID="$(Build.Repository.ID)" `
-                -e ADO_PR_ID="$(System.PullRequest.PullRequestId)" `
-                -e BUILD_SOURCEVERSION="$(Build.SourceVersion)" `
-                -v "$(Build.SourcesDirectory):C:\workspace" `
-                -w "C:\workspace\ai-pr-reviewer" `
-                $(CONTAINER_IMAGE) `
-                pwsh -NoLogo -Command "
-                  dotnet restore ./src/AiPr.Reviewer/AiPr.Reviewer.csproj;
-                  dotnet build ./src/AiPr.Reviewer/AiPr.Reviewer.csproj --configuration Release;
-                  dotnet test ./tests/AiPr.Reviewer.Tests/AiPr.Reviewer.Tests.csproj --configuration Release;
-                  dotnet run --configuration Release --project ./src/AiPr.Reviewer/AiPr.Reviewer.csproj
-                "
-            displayName: "Run AI PR Reviewer in container"
+          - pwsh: |
+              if (-not $env:AIREVIEWER_REPO_URL) {
+                Write-Error "AIREVIEWER_REPO_URL environment variable is not set"
+                exit 1
+              }
+              Write-Host "Cloning AIReviewer repository from: $env:AIREVIEWER_REPO_URL"
+              New-Item -ItemType Directory -Force -Path "$(Build.SourcesDirectory)\aireviewer-clone" | Out-Null
+              git clone $env:AIREVIEWER_REPO_URL "$(Build.SourcesDirectory)\aireviewer-clone"
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "Failed to clone AIReviewer repository"
+                exit 1
+              }
+              Write-Host "Successfully cloned AIReviewer repository"
+            displayName: "Clone AIReviewer Repository"
+            env:
+              AIREVIEWER_REPO_URL: '$(AIREVIEWER_REPO_URL)'
+
+          - pwsh: |
+              Write-Host "Restoring AIReviewer project..."
+              dotnet restore "$(Build.SourcesDirectory)\aireviewer-clone\AIReviewer\AIReviewer.csproj"
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "dotnet restore failed"
+                exit 1
+              }
+            displayName: "Restore AIReviewer"
+            condition: ne(variables['DRY_RUN'], 'skip')
+
+          - pwsh: |
+              Write-Host "Building AIReviewer project..."
+              dotnet build "$(Build.SourcesDirectory)\aireviewer-clone\AIReviewer\AIReviewer.csproj" --configuration Release --no-restore
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "dotnet build failed"
+                exit 1
+              }
+            displayName: "Build AIReviewer"
+            condition: ne(variables['DRY_RUN'], 'skip')
+
+          - pwsh: |
+              Write-Host "Running AIReviewer..."
+              $envFilePath = "$(Build.SourcesDirectory)\secrets\.env"
+              if (Test-Path $envFilePath) {
+                Write-Host "Loading environment variables from .env file"
+                Get-Content $envFilePath | ForEach-Object {
+                  if ($_ -match '^([^#][^=]+)=(.*)$') {
+                    [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+                  }
+                }
+              }
+              
+              $env:ADO_ACCESS_TOKEN = "$(System.AccessToken)"
+              $env:DRY_RUN = "$(DRY_RUN)"
+              $env:REVIEW_SCOPE = "$(REVIEW_SCOPE)"
+              $env:ADO_COLLECTION_URL = "$(System.CollectionUri)"
+              $env:ADO_PROJECT = "$(System.TeamProject)"
+              $env:ADO_REPO_ID = "$(Build.Repository.ID)"
+              $env:ADO_PR_ID = "$(System.PullRequest.PullRequestId)"
+              $env:BUILD_SOURCEVERSION = "$(Build.SourceVersion)"
+              
+              Set-Location "$(Build.SourcesDirectory)"
+              dotnet run --configuration Release --project "$(Build.SourcesDirectory)\aireviewer-clone\AIReviewer\AIReviewer.csproj" --no-build
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "AIReviewer execution failed"
+                exit 1
+              }
+            displayName: "Run AI PR Reviewer"
             env:
               REVIEW_SCOPE: '$(REVIEW_SCOPE)'
             condition: ne(variables['DRY_RUN'], 'skip')
@@ -69,7 +112,3 @@ stages:
         continueOnError: false
         env:
           DOTNET_CLI_TELEMETRY_OPTOUT: '1'
-        steps:
-          - checkout: self
-            persistCredentials: true
-

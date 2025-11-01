@@ -57,7 +57,7 @@ public sealed class AdoSdkClient : IDisposable
             var iterations = await _gitClient.GetPullRequestIterationsAsync(repo.Id, pr.PullRequestId, cancellationToken: cancellationToken);
             var latestIteration = iterations.OrderByDescending(i => i.Id).First();
 
-            return new PullRequestContext(pr, repo, commits.ToArray(), latestIteration);
+            return new PullRequestContext(pr, repo, [.. commits], latestIteration);
         });
     }
 

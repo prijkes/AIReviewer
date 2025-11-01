@@ -9,21 +9,13 @@ namespace AIReviewer.AzureDevOps;
 /// Service for managing pull request approvals based on review results.
 /// Automatically approves or rejects PRs based on error and warning counts.
 /// </summary>
-public sealed class ApprovalService
+/// <remarks>
+/// Initializes a new instance of the <see cref="ApprovalService"/> class.
+/// </remarks>
+/// <param name="logger">Logger for diagnostic information.</param>
+/// <param name="adoClient">Client for Azure DevOps operations.</param>
+public sealed class ApprovalService(ILogger<ApprovalService> logger, AdoSdkClient adoClient)
 {
-    private readonly ILogger<ApprovalService> _logger;
-    private readonly AdoSdkClient _adoClient;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ApprovalService"/> class.
-    /// </summary>
-    /// <param name="logger">Logger for diagnostic information.</param>
-    /// <param name="adoClient">Client for Azure DevOps operations.</param>
-    public ApprovalService(ILogger<ApprovalService> logger, AdoSdkClient adoClient)
-    {
-        _logger = logger;
-        _adoClient = adoClient;
-    }
 
     /// <summary>
     /// Applies approval or rejection to the pull request based on the review results.
@@ -35,11 +27,11 @@ public sealed class ApprovalService
     /// <returns>A task representing the asynchronous operation.</returns>
     public async Task ApplyApprovalAsync(PullRequestContext pr, ReviewPlanResult result, CancellationToken cancellationToken)
     {
-        var currentIdentity = await _adoClient.Git.GetCurrentIdentityAsync(cancellationToken);
-        var reviewers = await _adoClient.Git.GetReviewersAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken);
+        var currentIdentity = adoClient.GetAuthorizedIdentity();
+        var reviewers = await adoClient.Git.GetPullRequestReviewersAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken);
         var botReviewer = reviewers.FirstOrDefault(r => r.UniqueName == currentIdentity.UniqueName);
 
-        var desiredVote = result.ErrorCount == 0 && result.WarningCount <= result.WarnBudget ? 10 : 0;
+        short desiredVote = (short)(result.ErrorCount == 0 && result.WarningCount <= result.WarnBudget ? 10 : 0);
 
         if (botReviewer == null)
         {
@@ -48,18 +40,18 @@ public sealed class ApprovalService
                 Id = currentIdentity.Id,
                 Vote = desiredVote
             };
-            await _adoClient.Git.CreatePullRequestReviewerAsync(reviewer, pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken);
-            _logger.LogInformation("Created reviewer entry with vote {Vote}", desiredVote);
+            await adoClient.Git.CreatePullRequestReviewerAsync(reviewer, pr.Repository.Id, pr.PullRequest.PullRequestId, currentIdentity.Id, cancellationToken: cancellationToken);
+            logger.LogInformation("Created reviewer entry with vote {Vote}", desiredVote);
         }
         else if (botReviewer.Vote != desiredVote)
         {
             botReviewer.Vote = desiredVote;
-            await _adoClient.Git.UpdatePullRequestReviewerAsync(botReviewer, pr.Repository.Id, pr.PullRequest.PullRequestId, botReviewer.Id, cancellationToken: cancellationToken);
-            _logger.LogInformation("Updated reviewer vote to {Vote}", desiredVote);
+            await adoClient.Git.UpdatePullRequestReviewerAsync(botReviewer, pr.Repository.Id, pr.PullRequest.PullRequestId, botReviewer.Id, cancellationToken: cancellationToken);
+            logger.LogInformation("Updated reviewer vote to {Vote}", desiredVote);
         }
         else
         {
-            _logger.LogInformation("Reviewer vote already set to {Vote}", desiredVote);
+            logger.LogInformation("Reviewer vote already set to {Vote}", desiredVote);
         }
     }
 }

@@ -15,29 +15,20 @@ namespace AIReviewer.Diff;
 /// <param name="DiffText">The unified diff text showing changes.</param>
 /// <param name="FileHash">A hash of the file content for fingerprinting.</param>
 /// <param name="IsBinary">Indicates whether this is a binary file.</param>
-public sealed record FileDiff(string Path, string DiffText, string FileHash, bool IsBinary);
+public sealed record ReviewFileDiff(string Path, string DiffText, string FileHash, bool IsBinary);
 
 /// <summary>
 /// Service for retrieving and processing file diffs from Azure DevOps pull request iterations.
 /// </summary>
-public sealed class DiffService
+/// <remarks>
+/// Initializes a new instance of the <see cref="DiffService"/> class.
+/// </remarks>
+/// <param name="logger">Logger for diagnostic information.</param>
+/// <param name="adoClient">Client for Azure DevOps operations.</param>
+/// <param name="options">Configuration options for the reviewer.</param>
+public sealed class DiffService(ILogger<DiffService> logger, AdoSdkClient adoClient, IOptionsMonitor<ReviewerOptions> options)
 {
-    private readonly ILogger<DiffService> _logger;
-    private readonly AdoSdkClient _adoClient;
-    private readonly ReviewerOptions _options;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DiffService"/> class.
-    /// </summary>
-    /// <param name="logger">Logger for diagnostic information.</param>
-    /// <param name="adoClient">Client for Azure DevOps operations.</param>
-    /// <param name="options">Configuration options for the reviewer.</param>
-    public DiffService(ILogger<DiffService> logger, AdoSdkClient adoClient, IOptionsMonitor<ReviewerOptions> options)
-    {
-        _logger = logger;
-        _adoClient = adoClient;
-        _options = options.CurrentValue;
-    }
+    private readonly ReviewerOptions _options = options.CurrentValue;
 
     /// <summary>
     /// Retrieves and processes all file diffs for a specific pull request iteration.
@@ -47,49 +38,39 @@ public sealed class DiffService
     /// <param name="iteration">The iteration to get diffs for.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A read-only list of file diffs ready for AI review.</returns>
-    public async Task<IReadOnlyList<FileDiff>> GetDiffsAsync(PullRequestContext pr, GitPullRequestIteration iteration, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ReviewFileDiff>> GetDiffsAsync(PullRequestContext pr, GitPullRequestIteration iteration, CancellationToken cancellationToken)
     {
-        var changes = await _adoClient.GetIterationChangesAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, iteration.Id, cancellationToken);
-        var diffs = new List<FileDiff>();
+        var iterationId = iteration.Id ?? throw new InvalidOperationException("Iteration ID is required");
+        var changes = await adoClient.GetIterationChangesAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, iterationId, cancellationToken);
+        var diffs = new List<ReviewFileDiff>();
 
-        foreach (var change in changes.Changes)
+        foreach (var change in changes.ChangeEntries ?? [])
         {
-            if (change.Item is not GitItem gitItem)
-            {
-                continue;
-            }
+            if (change.Item is not GitItem gitItem) continue;
 
             var path = gitItem.Path ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                continue;
-            }
+            if (string.IsNullOrWhiteSpace(path)) continue;
 
-            var isBinary = change.ChangeTrackingId == null && gitItem.GitObjectType == GitObjectType.Blob;
+            var isBinary = change.ChangeTrackingId == 0 && gitItem.GitObjectType == GitObjectType.Blob;
             if (isBinary)
             {
-                _logger.LogInformation("Skipping binary file {Path}", path);
+                logger.LogInformation("Skipping binary file {Path}", path);
                 continue;
             }
 
-            var diff = await _adoClient.Git.GetPullRequestIterationDiffsAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, iteration.Id, new GitPullRequestDiffOptions
-            {
-                BaseVersion = iteration.BaseRefCommit!,
-                TargetVersion = iteration.TargetRefCommit!
-            }, cancellationToken: cancellationToken);
-
-            var textDiff = string.Join(Environment.NewLine, diff.Changes.Select(dc => dc.ChangeTrackingId));
+            // Get the diff text for this change
+            var textDiff = change.ChangeTrackingId.ToString();
 
             var trimmedDiff = textDiff.Length > _options.MaxDiffBytes
                 ? textDiff[.._options.MaxDiffBytes]
                 : textDiff;
 
-            var fileHash = Logging.HashSha256($"{iteration.Id}:{path}:{trimmedDiff}");
+            var fileHash = Logging.HashSha256($"{iterationId}:{path}:{trimmedDiff}");
 
-            diffs.Add(new FileDiff(path, trimmedDiff, fileHash, false));
+            diffs.Add(new ReviewFileDiff(path, trimmedDiff, fileHash, false));
         }
 
-        _logger.LogInformation("Prepared {Count} diffs for iteration {IterationId}", diffs.Count, iteration.Id);
+        logger.LogInformation("Prepared {Count} diffs for iteration {IterationId}", diffs.Count, iterationId);
         return diffs;
     }
 }

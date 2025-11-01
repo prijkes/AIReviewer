@@ -4,8 +4,10 @@ using AIReviewer.Utils;
 using AIReviewer.Diff;
 using AIReviewer.Options;
 using AIReviewer.Review;
-using Azure;
-using Azure.AI.OpenAI;
+using AIReviewer.AzureDevOps.Models;
+using OpenAI;
+using OpenAI.Chat;
+using System.ClientModel;
 
 namespace AIReviewer.AI;
 
@@ -17,32 +19,16 @@ public sealed class AzureFoundryAiClient : IAiClient
 {
     private readonly ILogger<AzureFoundryAiClient> _logger;
     private readonly ReviewerOptions _options;
-    private readonly AzureOpenAIClient _client;
+    private readonly OpenAIClient _client;
     private readonly RetryPolicyFactory _retryFactory;
 
     /// <summary>
-    /// System prompt that instructs the AI on how to perform code reviews and format responses.
+    /// System prompt that instructs the AI on how to perform code reviews.
+    /// Note: JSON schema is enforced via structured outputs, not via prompt instructions.
     /// </summary>
     private const string SystemPrompt = """
-    You are an expert C#/.NET code reviewer bot enforcing security, correctness, performance, readability, and testability. 
-    Respond in JSON with schema:
-    {
-      "issues": [
-        {
-          "id": "...",
-          "title": "...",
-          "severity": "info|warn|error",
-          "category": "security|correctness|style|performance|docs|tests",
-          "file": "path/to/file",
-          "line": 123,
-          "rationale": "...",
-          "recommendation": "...",
-          "fix_example": "..."
-        }
-      ],
-      "summary": ""
-    }
-    Do not include code content unless needed for fix_example. Evaluate only actionable issues.
+    You are an expert C#/.NET code reviewer bot enforcing security, correctness, performance, readability, and testability.
+    Evaluate only actionable issues. Do not include code content unless needed for fix_example.
     """;
 
     /// <summary>
@@ -56,21 +42,50 @@ public sealed class AzureFoundryAiClient : IAiClient
         _logger = logger;
         _options = options.CurrentValue;
         _retryFactory = retryFactory;
-        var endpoint = new Uri(_options.AiFoundryEndpoint);
-        var credential = new AzureKeyCredential(_options.AiFoundryApiKey);
-        _client = new AzureOpenAIClient(endpoint, credential);
+        
+        _client = new OpenAIClient(
+            credential: new ApiKeyCredential(_options.AiFoundryApiKey),
+            options: new OpenAIClientOptions()
+            {
+                Endpoint = new Uri(_options.AiFoundryEndpoint)
+            }
+        );
     }
 
     /// <inheritdoc/>
-    public async Task<AiReviewResponse> ReviewAsync(string policy, FileDiff fileDiff, CancellationToken cancellationToken)
+    public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, CancellationToken cancellationToken)
     {
-        var prompt = CreateUserPrompt(policy, fileDiff);
-        var response = await InvokeModelAsync(prompt, cancellationToken);
-        return ParseResponse(response);
+        var prompt = CreateUserPrompt(fileDiff);
+        var systemPrompt = $"{SystemPrompt}\n\nPolicy:\n{policy}";
+        
+        // Use ChatClient for structured outputs support
+        var chatClient = _client.GetChatClient(_options.AiFoundryDeployment);
+        
+        var messages = new List<ChatMessage>
+        {
+            new SystemChatMessage(systemPrompt),
+            new UserChatMessage(prompt)
+        };
+
+        var options = new ChatCompletionOptions
+        {
+            MaxOutputTokenCount = _options.AiMaxTokens,
+            Temperature = (float)_options.AiTemperature,
+            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                jsonSchemaFormatName: "ai_review_response",
+                jsonSchema: AiResponseSchemaGenerator.GetResponseSchema(),
+                jsonSchemaIsStrict: true)
+        };
+
+        var completion = await chatClient.CompleteChatAsync(messages, options, cancellationToken);
+        var content = completion.Value.Content[0].Text;
+        
+        _logger.LogInformation("AI response size {Size} bytes", content.Length);
+        return ParseResponse(content);
     }
 
     /// <inheritdoc/>
-    public async Task<AiReviewResponse> ReviewPullRequestMetadataAsync(string policy, PrMetadata metadata, CancellationToken cancellationToken)
+    public async Task<AiReviewResponse> ReviewPullRequestMetadataAsync(string policy, PullRequestMetadata metadata, CancellationToken cancellationToken)
     {
         var prompt = $"""
         Review the PR metadata for hygiene and completeness.
@@ -83,58 +98,55 @@ public sealed class AzureFoundryAiClient : IAiClient
         Provide actionable feedback only if something is missing or incorrect. Otherwise return empty issues.
         """;
 
-        var response = await InvokeModelAsync(policy + "\n\nMetadata review rubric: Ensure descriptive title, summary of changes, tests documented.", cancellationToken, prompt);
-        return ParseResponse(response);
-    }
-
-    /// <summary>
-    /// Invokes the Azure OpenAI model with the provided policy and user prompt.
-    /// </summary>
-    /// <param name="policy">The review policy to apply.</param>
-    /// <param name="cancellationToken">Cancellation token for the operation.</param>
-    /// <param name="userPrompt">Optional user prompt to customize the request.</param>
-    /// <returns>The raw JSON response from the AI model.</returns>
-    private async Task<string> InvokeModelAsync(string policy, CancellationToken cancellationToken, string? userPrompt = null)
-    {
-        var options = new ChatCompletionsOptions
+        var systemPrompt = $"{SystemPrompt}\n\nPolicy:\n{policy}\n\nMetadata review rubric: Ensure descriptive title, summary of changes, tests documented.";
+        
+        // Use ChatClient for structured outputs support
+        var chatClient = _client.GetChatClient(_options.AiFoundryDeployment);
+        
+        var messages = new List<ChatMessage>
         {
-            DeploymentName = _options.AiFoundryDeployment,
-            Temperature = (float)_options.AiTemperature,
-            MaxOutputTokens = _options.AiMaxTokens
+            new SystemChatMessage(systemPrompt),
+            new UserChatMessage(prompt)
         };
 
-        options.Messages.Add(new ChatRequestSystemMessage(SystemPrompt));
-        options.Messages.Add(new ChatRequestSystemMessage("Policy:\n" + policy));
-        options.Messages.Add(new ChatRequestUserMessage(userPrompt ?? policy));
-        options.Messages.Add(new ChatRequestAssistantMessage("Respond with the JSON envelope only."));
-        options.Messages.Add(new ChatRequestUserMessage(userPrompt ?? throw new InvalidOperationException("User prompt missing")));
+        var options = new ChatCompletionOptions
+        {
+            MaxOutputTokenCount = _options.AiMaxTokens,
+            Temperature = (float)_options.AiTemperature,
+            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                jsonSchemaFormatName: "ai_review_response",
+                jsonSchema: AiResponseSchemaGenerator.GetResponseSchema(),
+                jsonSchemaIsStrict: true)
+        };
 
-        var retry = _retryFactory.CreateHttpRetryPolicy(nameof(OpenAIClient));
-        var completions = await retry.ExecuteAsync(() => _client.GetChatCompletionsAsync(options, cancellationToken));
-        var content = completions.Value.Choices.First().Message.Content.FirstOrDefault()?.Text ?? "{}";
-        _logger.LogInformation("AI response size {Size} bytes", content.Length);
-        return content;
+        var completion = await chatClient.CompleteChatAsync(messages, options, cancellationToken);
+        var content = completion.Value.Content[0].Text;
+        
+        return ParseResponse(content);
     }
+
 
     /// <summary>
     /// Parses the raw JSON response from the AI model into a structured review response.
+    /// With structured outputs, the schema enforces enum values and required fields.
     /// </summary>
     /// <param name="content">The raw JSON content from the AI model.</param>
     /// <returns>A structured <see cref="AiReviewResponse"/> containing the identified issues.</returns>
-    /// <exception cref="InvalidDataException">Thrown when required fields are missing from the response.</exception>
+    /// <exception cref="InvalidDataException">Thrown when JSON parsing fails.</exception>
     private static AiReviewResponse ParseResponse(string content)
     {
         var envelope = JsonHelpers.DeserializeStrict<AiEnvelope>(content);
 
+        // With structured outputs, enum values and required fields are guaranteed by the schema
         var issues = envelope.Issues.Select(issue => new AiIssue(
-            issue.Id ?? throw new InvalidDataException("issue.id missing"),
-            issue.Title ?? throw new InvalidDataException("issue.title missing"),
-            issue.Severity?.ToLowerInvariant() ?? "info",
-            issue.Category?.ToLowerInvariant() ?? "style",
-            issue.File ?? string.Empty,
+            issue.Id,
+            issue.Title,
+            issue.Severity,
+            issue.Category,
+            issue.File,
             issue.Line,
-            issue.Rationale ?? string.Empty,
-            issue.Recommendation ?? string.Empty,
+            issue.Rationale,
+            issue.Recommendation,
             issue.FixExample
         )).ToList();
 
@@ -142,12 +154,11 @@ public sealed class AzureFoundryAiClient : IAiClient
     }
 
     /// <summary>
-    /// Creates a user prompt for reviewing a file diff by combining the policy and diff content.
+    /// Creates a user prompt for reviewing a file diff.
     /// </summary>
-    /// <param name="policy">The review policy.</param>
     /// <param name="fileDiff">The file diff to review.</param>
     /// <returns>A formatted prompt string.</returns>
-    private static string CreateUserPrompt(string policy, FileDiff fileDiff)
+    private static string CreateUserPrompt(ReviewFileDiff fileDiff)
     {
         var truncatedDiff = fileDiff.DiffText.Length > 8000 ? fileDiff.DiffText[..8000] : fileDiff.DiffText;
         return $"""
@@ -161,22 +172,23 @@ public sealed class AzureFoundryAiClient : IAiClient
 
     /// <summary>
     /// Internal envelope record for deserializing the AI response JSON.
+    /// With structured outputs, all required fields are guaranteed to be non-null.
     /// </summary>
     /// <param name="Issues">List of issue items from the response.</param>
-    /// <param name="Summary">Optional summary from the response.</param>
-    private sealed record AiEnvelope(List<AiItem> Issues, string? Summary);
+    private sealed record AiEnvelope(List<AiItem> Issues);
 
     /// <summary>
     /// Internal record representing a single issue item in the AI response JSON.
+    /// With structured outputs, enum values and required fields are guaranteed by the schema.
     /// </summary>
     private sealed record AiItem(
-        string? Id,
-        string? Title,
-        string? Severity,
-        string? Category,
-        string? File,
+        string Id,
+        string Title,
+        IssueSeverity Severity,
+        IssueCategory Category,
+        string File,
         int Line,
-        string? Rationale,
-        string? Recommendation,
+        string Rationale,
+        string Recommendation,
         string? FixExample);
 }

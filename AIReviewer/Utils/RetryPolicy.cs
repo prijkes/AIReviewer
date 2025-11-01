@@ -8,19 +8,12 @@ namespace AIReviewer.Utils;
 /// <summary>
 /// Factory for creating retry policies with exponential backoff for transient failures.
 /// </summary>
-public sealed class RetryPolicyFactory
+/// <remarks>
+/// Initializes a new instance of the <see cref="RetryPolicyFactory"/> class.
+/// </remarks>
+/// <param name="logger">Logger for diagnostic information.</param>
+public sealed class RetryPolicyFactory(ILogger<RetryPolicyFactory> logger)
 {
-    private readonly ILogger<RetryPolicyFactory> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="RetryPolicyFactory"/> class.
-    /// </summary>
-    /// <param name="logger">Logger for diagnostic information.</param>
-    public RetryPolicyFactory(ILogger<RetryPolicyFactory> logger)
-    {
-        _logger = logger;
-    }
-
     /// <summary>
     /// Creates an async retry policy for HTTP operations with exponential backoff.
     /// Retries on common transient failures like HTTP errors, timeouts, and service exceptions.
@@ -29,12 +22,12 @@ public sealed class RetryPolicyFactory
     /// <returns>An async retry policy configured for HTTP operations.</returns>
     public AsyncRetryPolicy CreateHttpRetryPolicy(string component)
     {
-        var delays = Backoff.ExponentialBackoff(TimeSpan.FromSeconds(2), 5, TimeSpan.FromSeconds(30));
-        return Policy.Handle<Exception>(ex =>
+        var delays = Backoff.DecorrelatedJitterBackoffV2(TimeSpan.FromSeconds(1), 5);
+        return Polly.Policy.Handle<Exception>(ex =>
             ex is HttpRequestException or TaskCanceledException or TimeoutException or Microsoft.VisualStudio.Services.Common.VssServiceException)
             .WaitAndRetryAsync(delays, (exception, timespan, retry, context) =>
             {
-                _logger.LogWarning(exception, "{Component} transient failure (attempt {Retry}). Retrying in {Delay}s", component, retry, timespan.TotalSeconds);
+                logger.LogWarning(exception, "{Component} transient failure (attempt {Retry}). Retrying in {Delay}s", component, retry, timespan.TotalSeconds);
             });
     }
 }

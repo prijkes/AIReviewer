@@ -1,5 +1,6 @@
 ﻿using AIReviewer.Diff;
 using AIReviewer.Review;
+using AIReviewer.AzureDevOps.Models;
 
 namespace AIReviewer.AI;
 
@@ -15,7 +16,7 @@ public interface IAiClient
     /// <param name="fileDiff">The file diff to review.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A response containing the list of issues found.</returns>
-    Task<AiReviewResponse> ReviewAsync(string policy, FileDiff fileDiff, CancellationToken cancellationToken);
+    Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reviews pull request metadata (title, description, commits) for hygiene and completeness.
@@ -24,7 +25,7 @@ public interface IAiClient
     /// <param name="metadata">The PR metadata to review.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A response containing the list of issues found.</returns>
-    Task<AiReviewResponse> ReviewPullRequestMetadataAsync(string policy, PrMetadata metadata, CancellationToken cancellationToken);
+    Task<AiReviewResponse> ReviewPullRequestMetadataAsync(string policy, PullRequestMetadata metadata, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -38,8 +39,8 @@ public sealed record AiReviewResponse(IReadOnlyList<AiIssue> Issues);
 /// </summary>
 /// <param name="Id">Unique identifier for the issue.</param>
 /// <param name="Title">Brief title describing the issue.</param>
-/// <param name="Severity">Severity level (info, warn, error).</param>
-/// <param name="Category">Category of the issue (security, correctness, style, performance, docs, tests).</param>
+/// <param name="Severity">Severity level of the issue.</param>
+/// <param name="Category">Category classification of the issue.</param>
 /// <param name="File">File path where the issue was found.</param>
 /// <param name="Line">Line number where the issue occurs.</param>
 /// <param name="Rationale">Explanation of why this is an issue.</param>
@@ -48,8 +49,8 @@ public sealed record AiReviewResponse(IReadOnlyList<AiIssue> Issues);
 public sealed record AiIssue(
     string Id,
     string Title,
-    string Severity,
-    string Category,
+    IssueSeverity Severity,
+    IssueCategory Category,
     string File,
     int Line,
     string Rationale,

@@ -8,21 +8,14 @@ namespace AIReviewer.Policy;
 /// Service for loading and processing review policy files.
 /// Converts markdown policy files to plain text for AI consumption.
 /// </summary>
-public sealed class PolicyLoader
+/// <remarks>
+/// Initializes a new instance of the <see cref="PolicyLoader"/> class.
+/// </remarks>
+/// <param name="logger">Logger for diagnostic information.</param>
+/// <param name="options">Configuration options for the reviewer.</param>
+public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<ReviewerOptions> options)
 {
-    private readonly ILogger<PolicyLoader> _logger;
-    private readonly ReviewerOptions _options;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="PolicyLoader"/> class.
-    /// </summary>
-    /// <param name="logger">Logger for diagnostic information.</param>
-    /// <param name="options">Configuration options for the reviewer.</param>
-    public PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<ReviewerOptions> options)
-    {
-        _logger = logger;
-        _options = options.CurrentValue;
-    }
+    private readonly ReviewerOptions _options = options.CurrentValue;
 
     /// <summary>
     /// Loads a policy file from disk and converts it from markdown to plain text.
@@ -42,7 +35,7 @@ public sealed class PolicyLoader
 
         var content = await File.ReadAllTextAsync(fullPath, cancellationToken);
         var sanitized = Markdig.Markdown.ToPlainText(content);
-        _logger.LogInformation("Loaded policy file {PolicyPath} (chars: {Length})", fullPath, sanitized.Length);
+        logger.LogInformation("Loaded policy file {PolicyPath} (chars: {Length})", fullPath, sanitized.Length);
         return sanitized;
     }
 }

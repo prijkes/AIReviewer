@@ -13,8 +13,7 @@ public static class Logging
     /// <returns>A hexadecimal string representation of the SHA-256 hash.</returns>
     public static string HashSha256(string input)
     {
-        using var sha = System.Security.Cryptography.SHA256.Create();
         var bytes = System.Text.Encoding.UTF8.GetBytes(input);
-        return Convert.ToHexString(sha.ComputeHash(bytes));
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
     }
 }

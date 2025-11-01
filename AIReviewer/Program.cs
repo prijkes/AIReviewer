@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using AIReviewer.AI;
 using AIReviewer.AzureDevOps;
 using AIReviewer.Diff;
@@ -37,10 +36,10 @@ internal static class Program
             .ConfigureLogging((ctx, logging) =>
             {
                 logging.ClearProviders();
-                logging.AddConsole(opts =>
+                logging.AddSimpleConsole(conf =>
                 {
-                    opts.IncludeScopes = true;
-                    opts.TimestampFormat = "HH:mm:ss ";
+                    conf.IncludeScopes = true;
+                    conf.TimestampFormat = "HH:mm:ss ";
                 });
             })
             .ConfigureServices((ctx, services) =>
@@ -76,40 +75,28 @@ internal static class Program
     /// <summary>
     /// Parses a POSIX-style .env file and hydrates environment variables into configuration.
     /// </summary>
-    private static IDictionary<string, string?> ParseDotEnv(string envFile)
+    private static Dictionary<string, string?> ParseDotEnv(string envFile)
     {
         var data = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var rawLine in File.ReadAllLines(envFile))
         {
-            if (string.IsNullOrWhiteSpace(rawLine))
-            {
-                continue;
-            }
+            if (string.IsNullOrWhiteSpace(rawLine)) continue;
 
             var line = rawLine.Trim();
-            if (line.StartsWith("#", StringComparison.Ordinal))
-            {
-                continue;
-            }
+            if (line.StartsWith('#')) continue;
 
-            if (line.StartsWith("export ", StringComparison.OrdinalIgnoreCase))
-            {
-                line = line["export ".Length..].TrimStart();
-            }
+            if (line.StartsWith("export ", StringComparison.OrdinalIgnoreCase)) line = line["export ".Length..].TrimStart();
 
             var separatorIndex = line.IndexOf('=');
-            if (separatorIndex <= 0)
-            {
-                continue;
-            }
+            if (separatorIndex <= 0) continue;
 
             var key = line[..separatorIndex].Trim();
             var value = line[(separatorIndex + 1)..].Trim();
 
             if (value.Length >= 2 &&
-                ((value.StartsWith("\"", StringComparison.Ordinal) && value.EndsWith("\"", StringComparison.Ordinal)) ||
-                 (value.StartsWith("'", StringComparison.Ordinal) && value.EndsWith("'", StringComparison.Ordinal))))
+                ((value.StartsWith('"') && value.EndsWith('"')) ||
+                 (value.StartsWith('\'') && value.EndsWith('\''))))
             {
                 value = value[1..^1];
             }

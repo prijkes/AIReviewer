@@ -5,6 +5,7 @@ using AIReviewer.Options;
 using AIReviewer.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.TeamFoundation.SourceControl.WebApi;
 
 namespace AIReviewer.Review;
 
@@ -14,7 +15,7 @@ namespace AIReviewer.Review;
 /// <param name="Title">The PR title.</param>
 /// <param name="Description">The PR description.</param>
 /// <param name="CommitMessages">List of commit messages in the PR.</param>
-public sealed record PrMetadata(string Title, string Description, IReadOnlyList<string> CommitMessages);
+public sealed record PullRequestMetadata(string Title, string Description, IReadOnlyList<string> CommitMessages);
 
 /// <summary>
 /// Contains the results of a code review plan including all identified issues and counts.
@@ -34,24 +35,15 @@ public sealed record ReviewPlanResult(IReadOnlyList<ReviewIssue> Issues, int Err
 /// <summary>
 /// Orchestrates the AI review process by analyzing file diffs and PR metadata to produce review results.
 /// </summary>
-public sealed class ReviewPlanner
+/// <remarks>
+/// Initializes a new instance of the <see cref="ReviewPlanner"/> class.
+/// </remarks>
+/// <param name="logger">Logger for diagnostic information.</param>
+/// <param name="aiClient">AI client for performing code reviews.</param>
+/// <param name="options">Configuration options for the reviewer.</param>
+public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiClient, IOptionsMonitor<ReviewerOptions> options)
 {
-    private readonly ILogger<ReviewPlanner> _logger;
-    private readonly IAiClient _aiClient;
-    private readonly ReviewerOptions _options;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ReviewPlanner"/> class.
-    /// </summary>
-    /// <param name="logger">Logger for diagnostic information.</param>
-    /// <param name="aiClient">AI client for performing code reviews.</param>
-    /// <param name="options">Configuration options for the reviewer.</param>
-    public ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiClient, IOptionsMonitor<ReviewerOptions> options)
-    {
-        _logger = logger;
-        _aiClient = aiClient;
-        _options = options.CurrentValue;
-    }
+    private readonly ReviewerOptions _options = options.CurrentValue;
 
     /// <summary>
     /// Plans and executes the complete review process for a pull request.
@@ -63,7 +55,7 @@ public sealed class ReviewPlanner
     /// <param name="policy">The review policy to apply.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A <see cref="ReviewPlanResult"/> containing all identified issues and counts.</returns>
-    public async Task<ReviewPlanResult> PlanAsync(PullRequestContext pr, Microsoft.TeamFoundation.SourceControl.WebApi.GitPullRequestIteration iteration, IReadOnlyList<FileDiff> diffs, string policy, CancellationToken cancellationToken)
+    public async Task<ReviewPlanResult> PlanAsync(PullRequestContext pr, GitPullRequestIteration iteration, IReadOnlyList<ReviewFileDiff> diffs, string policy, CancellationToken cancellationToken)
     {
         var issues = new List<ReviewIssue>();
 
@@ -71,20 +63,20 @@ public sealed class ReviewPlanner
         {
             if (diff.DiffText.Length > _options.MaxDiffBytes)
             {
-                _logger.LogWarning("Skipping large diff {Path} ({Size} bytes)", diff.Path, diff.DiffText.Length);
+                logger.LogWarning("Skipping large diff {Path} ({Size} bytes)", diff.Path, diff.DiffText.Length);
                 continue;
             }
 
-            var aiResponse = await _aiClient.ReviewAsync(policy, diff, cancellationToken);
+            var aiResponse = await aiClient.ReviewAsync(policy, diff, cancellationToken);
             foreach (var issue in aiResponse.Issues.Take(5))
             {
-                var fingerprint = ComputeFingerprint(diff, iteration.Id, issue);
+                var fingerprint = ComputeFingerprint(diff, iteration.Id ?? 0, issue);
                 issues.Add(new ReviewIssue
                 {
                     Id = issue.Id,
                     Title = issue.Title,
-                    Severity = ParseSeverity(issue.Severity),
-                    Category = ParseCategory(issue.Category),
+                    Severity = issue.Severity,
+                    Category = issue.Category,
                     FilePath = string.IsNullOrEmpty(issue.File) ? diff.Path : issue.File,
                     Line = issue.Line,
                     Rationale = issue.Rationale,
@@ -112,23 +104,23 @@ public sealed class ReviewPlanner
     /// <param name="iterationId">The current iteration ID for fingerprinting.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A collection of issues found in the PR metadata.</returns>
-    private async Task<IEnumerable<ReviewIssue>> ReviewMetadataAsync(PullRequestContext pr, string policy, int iterationId, CancellationToken cancellationToken)
+    private async Task<IEnumerable<ReviewIssue>> ReviewMetadataAsync(PullRequestContext pr, string policy, int? iterationId, CancellationToken cancellationToken)
     {
-        var metadata = new PrMetadata(
+        var metadata = new PullRequestMetadata(
             pr.PullRequest.Title ?? string.Empty,
             pr.PullRequest.Description ?? string.Empty,
-            pr.Commits.Select(c => c.Comment ?? string.Empty).ToList());
+            [.. pr.Commits.Select(c => c.Comment ?? string.Empty)]);
 
-        var response = await _aiClient.ReviewPullRequestMetadataAsync(policy, metadata, cancellationToken);
+        var response = await aiClient.ReviewPullRequestMetadataAsync(policy, metadata, cancellationToken);
         return response.Issues.Select(issue =>
         {
-            var fingerprint = Logging.HashSha256($"{issue.Id}:{issue.Title}:{iterationId}");
+            var fingerprint = Logging.HashSha256($"{issue.Id}:{issue.Title}:{iterationId ?? 0}");
             return new ReviewIssue
             {
                 Id = issue.Id,
                 Title = issue.Title,
-                Severity = ParseSeverity(issue.Severity),
-                Category = ParseCategory(issue.Category),
+                Severity = issue.Severity,
+                Category = issue.Category,
                 FilePath = string.Empty,
                 Line = 0,
                 Rationale = issue.Rationale,
@@ -140,33 +132,6 @@ public sealed class ReviewPlanner
     }
 
     /// <summary>
-    /// Parses a category string from the AI response to an enum value.
-    /// </summary>
-    /// <param name="category">The category string to parse.</param>
-    /// <returns>The corresponding <see cref="IssueCategory"/> enum value.</returns>
-    private static IssueCategory ParseCategory(string category) => category.ToLowerInvariant() switch
-    {
-        "security" => IssueCategory.Security,
-        "correctness" => IssueCategory.Correctness,
-        "performance" => IssueCategory.Performance,
-        "docs" => IssueCategory.Docs,
-        "tests" => IssueCategory.Tests,
-        _ => IssueCategory.Style
-    };
-
-    /// <summary>
-    /// Parses a severity string from the AI response to an enum value.
-    /// </summary>
-    /// <param name="severity">The severity string to parse.</param>
-    /// <returns>The corresponding <see cref="IssueSeverity"/> enum value.</returns>
-    private static IssueSeverity ParseSeverity(string severity) => severity.ToLowerInvariant() switch
-    {
-        "error" => IssueSeverity.Error,
-        "warn" => IssueSeverity.Warn,
-        _ => IssueSeverity.Info
-    };
-
-    /// <summary>
     /// Computes a unique fingerprint for an issue based on file path, line, ID, and other attributes.
     /// This fingerprint is used to track issues across PR iterations.
     /// </summary>
@@ -174,6 +139,6 @@ public sealed class ReviewPlanner
     /// <param name="iterationId">The PR iteration ID.</param>
     /// <param name="issue">The AI-identified issue.</param>
     /// <returns>A SHA-256 hash fingerprint string.</returns>
-    private static string ComputeFingerprint(FileDiff diff, int iterationId, AiIssue issue) =>
+    private static string ComputeFingerprint(ReviewFileDiff diff, int iterationId, AiIssue issue) =>
         Logging.HashSha256($"{diff.Path}:{issue.Line}:{issue.Id}:{issue.Title}:{iterationId}:{diff.FileHash}");
 }
