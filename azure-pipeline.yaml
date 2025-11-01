@@ -1,0 +1,75 @@
+# azure-pipelines.yml
+trigger: none
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  DOTNET_VERSION: '8.0.x'
+  CONTAINER_IMAGE: 'mcr.microsoft.com/dotnet/sdk:8.0-windowsservercore-ltsc2022'
+  DRY_RUN: 'false'
+
+stages:
+  - stage: AI_PR_Review
+    displayName: "AI PR Review"
+    jobs:
+      - job: RunAiReview
+        displayName: "Run AI PR Reviewer"
+        pool:
+          vmImage: 'windows-latest'
+        steps:
+          - checkout: self
+            persistCredentials: true
+
+          - task: UseDotNet@2
+            displayName: "Install .NET $(DOTNET_VERSION)"
+            inputs:
+              packageType: 'sdk'
+              version: '$(DOTNET_VERSION)'
+
+          - pwsh: |
+              Write-Host "Setting up .env from secure files/variables"
+              New-Item -ItemType Directory -Force -Path "$(Build.SourcesDirectory)\secrets" | Out-Null
+              Set-Content -Path "$(Build.SourcesDirectory)\secrets\.env" -Value "$(ENV_FILE_CONTENT)" -NoNewline
+            displayName: "Materialize .env file"
+            env:
+              ENV_FILE_CONTENT: '$(ENV_FILE_CONTENT)'
+
+          - script: |
+              docker run --rm `
+                --env-file "$(Build.SourcesDirectory)\secrets\.env" `
+                -e ADO_ACCESS_TOKEN="$(System.AccessToken)" `
+                -e DRY_RUN="$(DRY_RUN)" `
+                -e REVIEW_SCOPE="$(REVIEW_SCOPE)" `
+                -e ADO_COLLECTION_URL="$(System.CollectionUri)" `
+                -e ADO_PROJECT="$(System.TeamProject)" `
+                -e ADO_REPO_ID="$(Build.Repository.ID)" `
+                -e ADO_PR_ID="$(System.PullRequest.PullRequestId)" `
+                -e BUILD_SOURCEVERSION="$(Build.SourceVersion)" `
+                -v "$(Build.SourcesDirectory):C:\workspace" `
+                -w "C:\workspace\ai-pr-reviewer" `
+                $(CONTAINER_IMAGE) `
+                pwsh -NoLogo -Command "
+                  dotnet restore ./src/AiPr.Reviewer/AiPr.Reviewer.csproj;
+                  dotnet build ./src/AiPr.Reviewer/AiPr.Reviewer.csproj --configuration Release;
+                  dotnet test ./tests/AiPr.Reviewer.Tests/AiPr.Reviewer.Tests.csproj --configuration Release;
+                  dotnet run --configuration Release --project ./src/AiPr.Reviewer/AiPr.Reviewer.csproj
+                "
+            displayName: "Run AI PR Reviewer in container"
+            env:
+              REVIEW_SCOPE: '$(REVIEW_SCOPE)'
+            condition: ne(variables['DRY_RUN'], 'skip')
+
+        variables:
+          REVIEW_SCOPE: 'changed-files'
+        workspace:
+          clean: all
+        timeoutInMinutes: 120
+        continueOnError: false
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+        steps:
+          - checkout: self
+            persistCredentials: true
+
