@@ -92,6 +92,7 @@ stages:
               $env:ADO_REPO_ID = "$(Build.Repository.ID)"
               $env:ADO_PR_ID = "$(System.PullRequest.PullRequestId)"
               $env:BUILD_SOURCEVERSION = "$(Build.SourceVersion)"
+              $env:LOCAL_REPO_PATH = "$(Build.SourcesDirectory)"
               
               Set-Location "$(Build.SourcesDirectory)"
               dotnet run --configuration Release --project "$(Build.SourcesDirectory)\aireviewer-clone\AIReviewer\AIReviewer.csproj" --no-build

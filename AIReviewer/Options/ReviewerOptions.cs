@@ -69,6 +69,13 @@ public sealed class ReviewerOptions
     public int AiMaxTokens { get; set; } = 2000;
 
     /// <summary>
+    /// Enables OpenAI function calling to allow the AI to retrieve additional context during review.
+    /// When enabled, the AI can call functions to get full file contents, search the codebase, etc.
+    /// This improves review quality but increases API costs and latency. Default is false.
+    /// </summary>
+    public bool EnableFunctionCalling { get; set; } = false;
+
+    /// <summary>
     /// When true, performs review without posting comments or approvals to Azure DevOps. Default is false.
     /// </summary>
     public bool DryRun { get; set; } = false;
@@ -124,6 +131,13 @@ public sealed class ReviewerOptions
     public string? BuildSourceVersion { get; set; }
 
     /// <summary>
+    /// Local repository path for accessing files directly from the filesystem instead of Azure DevOps API.
+    /// When running in Azure Pipelines, this should be set to $(Build.SourcesDirectory).
+    /// This dramatically reduces API calls and avoids rate limiting for large codebases.
+    /// </summary>
+    public string? LocalRepoPath { get; set; }
+
+    /// <summary>
     /// Normalizes option values by applying default values where needed.
     /// </summary>
     public void Normalize()
@@ -131,5 +145,11 @@ public sealed class ReviewerOptions
         ReviewScope = string.IsNullOrWhiteSpace(ReviewScope) ? "changed-files" : ReviewScope;
         AiFoundryDeployment = string.IsNullOrWhiteSpace(AiFoundryDeployment) ? "o4-mini" : AiFoundryDeployment;
         PolicyPath = string.IsNullOrWhiteSpace(PolicyPath) ? "./policy/review-policy.md" : PolicyPath;
+        
+        // Normalize LocalRepoPath to use forward slashes and remove trailing slash
+        if (!string.IsNullOrWhiteSpace(LocalRepoPath))
+        {
+            LocalRepoPath = LocalRepoPath.Replace('\\', '/').TrimEnd('/');
+        }
     }
 }

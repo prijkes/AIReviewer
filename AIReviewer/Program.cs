@@ -63,6 +63,7 @@ internal static class Program
                 services.AddSingleton<DiffService>();
                 services.AddSingleton<StateStore>();
                 services.AddSingleton<ReviewPlanner>();
+                services.AddSingleton<ReviewContextRetriever>();
                 services.AddSingleton<IAiClient, AzureFoundryAiClient>();
 
                 services.AddHostedService<ReviewerHostedService>();

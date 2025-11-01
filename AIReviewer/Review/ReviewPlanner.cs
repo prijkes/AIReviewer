@@ -40,8 +40,9 @@ public sealed record ReviewPlanResult(IReadOnlyList<ReviewIssue> Issues, int Err
 /// </remarks>
 /// <param name="logger">Logger for diagnostic information.</param>
 /// <param name="aiClient">AI client for performing code reviews.</param>
+/// <param name="contextRetriever">Context retriever for function calling support.</param>
 /// <param name="options">Configuration options for the reviewer.</param>
-public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiClient, IOptionsMonitor<ReviewerOptions> options)
+public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiClient, ReviewContextRetriever contextRetriever, IOptionsMonitor<ReviewerOptions> options)
 {
     private readonly ReviewerOptions _options = options.CurrentValue;
 
@@ -58,6 +59,9 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     public async Task<ReviewPlanResult> PlanAsync(PullRequestContext pr, GitPullRequestIteration iteration, IReadOnlyList<ReviewFileDiff> diffs, string policy, CancellationToken cancellationToken)
     {
         var issues = new List<ReviewIssue>();
+
+        // Set PR context for function calling
+        contextRetriever.SetContext(pr);
 
         // Detect language from PR description
         var prDescription = pr.PullRequest.Description ?? string.Empty;
