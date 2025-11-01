@@ -9,6 +9,11 @@ using Microsoft.Extensions.Options;
 
 namespace AIReviewer;
 
+/// <summary>
+/// Hosted service that orchestrates the AI-powered pull request review process.
+/// This is the main entry point that coordinates fetching PR data, analyzing diffs,
+/// generating reviews, and posting results back to Azure DevOps.
+/// </summary>
 public sealed class ReviewerHostedService : IHostedService
 {
     private readonly ILogger<ReviewerHostedService> _logger;
@@ -21,6 +26,9 @@ public sealed class ReviewerHostedService : IHostedService
     private readonly PolicyLoader _policyLoader;
     private readonly ReviewerOptions _options;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ReviewerHostedService"/> class.
+    /// </summary>
     public ReviewerHostedService(
         ILogger<ReviewerHostedService> logger,
         IHostApplicationLifetime lifetime,
@@ -43,6 +51,12 @@ public sealed class ReviewerHostedService : IHostedService
         _options = options.CurrentValue;
     }
 
+    /// <summary>
+    /// Starts the review process when the hosted service starts.
+    /// Fetches PR context, analyzes diffs, generates AI reviews, and posts results.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         using var scope = _logger.BeginScope("PR:{Project}/{Repo}#{PR}", _options.AdoProject, _options.AdoRepoId ?? _options.AdoRepoName, _options.AdoPullRequestId);
@@ -82,5 +96,10 @@ public sealed class ReviewerHostedService : IHostedService
         }
     }
 
+    /// <summary>
+    /// Stops the hosted service. No cleanup needed as the application exits after review completion.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A completed task.</returns>
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

@@ -6,16 +6,29 @@ using Microsoft.TeamFoundation.SourceControl.WebApi;
 
 namespace AIReviewer.AzureDevOps;
 
+/// <summary>
+/// Service for managing review comments and threads on Azure DevOps pull requests.
+/// Handles creating, updating, and resolving comment threads based on AI-identified issues.
+/// </summary>
 public sealed class CommentService
 {
     private readonly ILogger<CommentService> _logger;
     private readonly AdoSdkClient _adoClient;
     private readonly RetryPolicyFactory _retryPolicy;
 
+    /// <summary>Property key to identify bot-created threads.</summary>
     private const string BotProperty = "ai-bot";
+    /// <summary>Property key to store issue fingerprints for tracking across iterations.</summary>
     private const string FingerprintProperty = "fingerprint";
+    /// <summary>Identifier for the special state tracking thread.</summary>
     private const string StateThreadIdentifier = "ai-state";
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CommentService"/> class.
+    /// </summary>
+    /// <param name="logger">Logger for diagnostic information.</param>
+    /// <param name="adoClient">Client for Azure DevOps operations.</param>
+    /// <param name="retryPolicy">Factory for creating retry policies.</param>
     public CommentService(ILogger<CommentService> logger, AdoSdkClient adoClient, RetryPolicyFactory retryPolicy)
     {
         _logger = logger;
@@ -23,6 +36,14 @@ public sealed class CommentService
         _retryPolicy = retryPolicy;
     }
 
+    /// <summary>
+    /// Applies the review results by creating, updating, or resolving comment threads on the pull request.
+    /// </summary>
+    /// <param name="pr">The pull request context.</param>
+    /// <param name="iteration">The current PR iteration.</param>
+    /// <param name="result">The review results containing identified issues.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task ApplyReviewAsync(PullRequestContext pr, GitPullRequestIteration iteration, ReviewPlanResult result, CancellationToken cancellationToken)
     {
         var threads = await _adoClient.Git.GetThreadsAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken);
@@ -45,6 +66,14 @@ public sealed class CommentService
         await UpsertStateThreadAsync(pr, result, botThreads, cancellationToken);
     }
 
+    /// <summary>
+    /// Creates a new comment thread for an issue that hasn't been reported before.
+    /// </summary>
+    /// <param name="pr">The pull request context.</param>
+    /// <param name="iteration">The current PR iteration.</param>
+    /// <param name="issue">The issue to create a thread for.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     private async Task CreateThreadAsync(PullRequestContext pr, GitPullRequestIteration iteration, ReviewIssue issue, CancellationToken cancellationToken)
     {
         var thread = new GitPullRequestCommentThread
@@ -83,6 +112,15 @@ public sealed class CommentService
         _logger.LogInformation("Created new comment thread for issue {FingerPrint}", issue.Fingerprint);
     }
 
+    /// <summary>
+    /// Appends a new comment to an existing thread when the same issue is re-triggered.
+    /// Reopens the thread if it was previously closed or fixed.
+    /// </summary>
+    /// <param name="pr">The pull request context.</param>
+    /// <param name="thread">The existing thread to append to.</param>
+    /// <param name="issue">The re-triggered issue.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     private async Task AppendToExistingThreadAsync(PullRequestContext pr, GitPullRequestCommentThread thread, ReviewIssue issue, CancellationToken cancellationToken)
     {
         var retry = _retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
@@ -105,6 +143,16 @@ public sealed class CommentService
         _logger.LogInformation("Appended to existing thread {ThreadId}", thread.Id);
     }
 
+    /// <summary>
+    /// Resolves threads for issues that no longer appear in the current review results.
+    /// Marks them as fixed to indicate the issue has been addressed.
+    /// </summary>
+    /// <param name="pr">The pull request context.</param>
+    /// <param name="iteration">The current PR iteration.</param>
+    /// <param name="result">The current review results.</param>
+    /// <param name="botThreads">All bot-created threads.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     private async Task ResolveClearedThreadsAsync(PullRequestContext pr, GitPullRequestIteration iteration, ReviewPlanResult result, List<GitPullRequestCommentThread> botThreads, CancellationToken cancellationToken)
     {
         var remainingFingerprints = result.Issues.Select(i => i.Fingerprint).ToHashSet();
@@ -130,6 +178,15 @@ public sealed class CommentService
         }
     }
 
+    /// <summary>
+    /// Creates or updates a special state thread that tracks all issue fingerprints.
+    /// This hidden thread maintains a JSON record of all active issues.
+    /// </summary>
+    /// <param name="pr">The pull request context.</param>
+    /// <param name="result">The current review results.</param>
+    /// <param name="botThreads">All bot-created threads.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     private async Task UpsertStateThreadAsync(PullRequestContext pr, ReviewPlanResult result, List<GitPullRequestCommentThread> botThreads, CancellationToken cancellationToken)
     {
         var state = new
@@ -180,6 +237,11 @@ public sealed class CommentService
         }
     }
 
+    /// <summary>
+    /// Formats a review issue into a markdown comment for display on Azure DevOps.
+    /// </summary>
+    /// <param name="issue">The issue to format.</param>
+    /// <returns>A markdown-formatted comment string.</returns>
     private static string FormatComment(ReviewIssue issue)
     {
         var builder = new System.Text.StringBuilder();

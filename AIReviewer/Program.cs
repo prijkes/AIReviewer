@@ -14,6 +14,9 @@ using Microsoft.Extensions.Logging;
 
 namespace AIReviewer;
 
+/// <summary>
+/// Entry point host builder for the AI pull request reviewer console application.
+/// </summary>
 internal static class Program
 {
     private static async Task Main(string[] args)
@@ -70,6 +73,9 @@ internal static class Program
         await host.RunAsync();
     }
 
+    /// <summary>
+    /// Parses a POSIX-style .env file and hydrates environment variables into configuration.
+    /// </summary>
     private static IDictionary<string, string?> ParseDotEnv(string envFile)
     {
         var data = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);

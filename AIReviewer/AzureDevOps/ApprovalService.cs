@@ -5,17 +5,34 @@ using AIReviewer.Review;
 
 namespace AIReviewer.AzureDevOps;
 
+/// <summary>
+/// Service for managing pull request approvals based on review results.
+/// Automatically approves or rejects PRs based on error and warning counts.
+/// </summary>
 public sealed class ApprovalService
 {
     private readonly ILogger<ApprovalService> _logger;
     private readonly AdoSdkClient _adoClient;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ApprovalService"/> class.
+    /// </summary>
+    /// <param name="logger">Logger for diagnostic information.</param>
+    /// <param name="adoClient">Client for Azure DevOps operations.</param>
     public ApprovalService(ILogger<ApprovalService> logger, AdoSdkClient adoClient)
     {
         _logger = logger;
         _adoClient = adoClient;
     }
 
+    /// <summary>
+    /// Applies approval or rejection to the pull request based on the review results.
+    /// Approves (vote 10) if no errors and warnings are within budget; otherwise waits (vote 0).
+    /// </summary>
+    /// <param name="pr">The pull request context.</param>
+    /// <param name="result">The review results containing error and warning counts.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task ApplyApprovalAsync(PullRequestContext pr, ReviewPlanResult result, CancellationToken cancellationToken)
     {
         var currentIdentity = await _adoClient.Git.GetCurrentIdentityAsync(cancellationToken);
