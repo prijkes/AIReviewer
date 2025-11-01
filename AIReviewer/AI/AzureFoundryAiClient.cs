@@ -53,14 +53,17 @@ public sealed class AzureFoundryAiClient : IAiClient
     }
 
     /// <inheritdoc/>
-    public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, CancellationToken cancellationToken)
+    public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Requesting AI review for {Path} ({DiffSize} bytes)",
-            fileDiff.Path, fileDiff.DiffText.Length);
+        _logger.LogDebug("Requesting AI review for {Path} ({DiffSize} bytes) in language: {Language}",
+            fileDiff.Path, fileDiff.DiffText.Length, language);
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var prompt = CreateUserPrompt(fileDiff);
-        var systemPrompt = $"{SystemPrompt}\n\nPolicy:\n{policy}";
+        var languageInstruction = language == "ja" 
+            ? "\n\nIMPORTANT: Provide all review feedback in Japanese language." 
+            : "\n\nIMPORTANT: Provide all review feedback in English language.";
+        var systemPrompt = $"{SystemPrompt}\n\nPolicy:\n{policy}{languageInstruction}";
         
         // Use ChatClient for structured outputs support
         var chatClient = _client.GetChatClient(_options.AiFoundryDeployment);
@@ -103,20 +106,33 @@ public sealed class AzureFoundryAiClient : IAiClient
     }
 
     /// <inheritdoc/>
-    public async Task<AiReviewResponse> ReviewPullRequestMetadataAsync(string policy, PullRequestMetadata metadata, CancellationToken cancellationToken)
+    public async Task<AiReviewResponse> ReviewPullRequestMetadataAsync(string policy, PullRequestMetadata metadata, string language, CancellationToken cancellationToken)
     {
+        _logger.LogDebug("Requesting metadata review in language: {Language}", language);
+
+        var commitMessages = metadata.CommitMessages.Take(_options.MaxCommitMessagesToReview).ToList();
+        
+        if (metadata.CommitMessages.Count > _options.MaxCommitMessagesToReview)
+        {
+            _logger.LogDebug("Truncating commit messages for metadata review ({Total} commits -> {Max} commits)",
+                metadata.CommitMessages.Count, _options.MaxCommitMessagesToReview);
+        }
+
         var prompt = $"""
         Review the PR metadata for hygiene and completeness.
 
         Title: {metadata.Title}
         Description: {metadata.Description}
         Commits:
-        {string.Join(Environment.NewLine, metadata.CommitMessages.Take(10))}
+        {string.Join(Environment.NewLine, commitMessages)}
 
         Provide actionable feedback only if something is missing or incorrect. Otherwise return empty issues.
         """;
 
-        var systemPrompt = $"{SystemPrompt}\n\nPolicy:\n{policy}\n\nMetadata review rubric: Ensure descriptive title, summary of changes, tests documented.";
+        var languageInstruction = language == "ja"
+            ? "\n\nIMPORTANT: Provide all review feedback in Japanese language."
+            : "\n\nIMPORTANT: Provide all review feedback in English language.";
+        var systemPrompt = $"{SystemPrompt}\n\nPolicy:\n{policy}\n\nMetadata review rubric: Ensure descriptive title, summary of changes, tests documented.{languageInstruction}";
         
         // Use ChatClient for structured outputs support
         var chatClient = _client.GetChatClient(_options.AiFoundryDeployment);
@@ -176,9 +192,16 @@ public sealed class AzureFoundryAiClient : IAiClient
     /// </summary>
     /// <param name="fileDiff">The file diff to review.</param>
     /// <returns>A formatted prompt string.</returns>
-    private static string CreateUserPrompt(ReviewFileDiff fileDiff)
+    private string CreateUserPrompt(ReviewFileDiff fileDiff)
     {
-        var truncatedDiff = fileDiff.DiffText.Length > 8000 ? fileDiff.DiffText[..8000] : fileDiff.DiffText;
+        var truncatedDiff = fileDiff.DiffText;
+        if (fileDiff.DiffText.Length > _options.MaxPromptDiffBytes)
+        {
+            truncatedDiff = fileDiff.DiffText[.._options.MaxPromptDiffBytes];
+            _logger.LogDebug("Truncating diff in prompt for {Path} ({Original} bytes -> {Truncated} bytes)",
+                fileDiff.Path, fileDiff.DiffText.Length, _options.MaxPromptDiffBytes);
+        }
+
         return $"""
         File: {fileDiff.Path}
         Unified Diff:

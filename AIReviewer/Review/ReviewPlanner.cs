@@ -59,6 +59,11 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     {
         var issues = new List<ReviewIssue>();
 
+        // Detect language from PR description
+        var prDescription = pr.PullRequest.Description ?? string.Empty;
+        var language = Logging.DetectLanguage(prDescription);
+        logger.LogInformation("Detected review language: {Language} (based on PR description)", language);
+
         if (diffs.Count > _options.MaxFilesToReview)
         {
             logger.LogWarning("PR has {TotalFiles} files, reviewing first {MaxFiles} only", diffs.Count, _options.MaxFilesToReview);
@@ -72,7 +77,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
                 continue;
             }
 
-            var aiResponse = await aiClient.ReviewAsync(policy, diff, cancellationToken);
+            var aiResponse = await aiClient.ReviewAsync(policy, diff, language, cancellationToken);
             
             if (aiResponse.Issues.Count > _options.MaxIssuesPerFile)
             {
@@ -99,7 +104,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
             }
         }
 
-        var metadataIssues = await ReviewMetadataAsync(pr, policy, iteration.Id, cancellationToken);
+        var metadataIssues = await ReviewMetadataAsync(pr, policy, language, iteration.Id, cancellationToken);
         issues.AddRange(metadataIssues);
 
         var errorCount = issues.Count(i => i.Severity == IssueSeverity.Error);
@@ -113,17 +118,18 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     /// </summary>
     /// <param name="pr">The pull request context.</param>
     /// <param name="policy">The review policy to apply.</param>
+    /// <param name="language">The language code for the review response.</param>
     /// <param name="iterationId">The current iteration ID for fingerprinting.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A collection of issues found in the PR metadata.</returns>
-    private async Task<IEnumerable<ReviewIssue>> ReviewMetadataAsync(PullRequestContext pr, string policy, int? iterationId, CancellationToken cancellationToken)
+    private async Task<IEnumerable<ReviewIssue>> ReviewMetadataAsync(PullRequestContext pr, string policy, string language, int? iterationId, CancellationToken cancellationToken)
     {
         var metadata = new PullRequestMetadata(
             pr.PullRequest.Title ?? string.Empty,
             pr.PullRequest.Description ?? string.Empty,
             [.. pr.Commits.Select(c => c.Comment ?? string.Empty)]);
 
-        var response = await aiClient.ReviewPullRequestMetadataAsync(policy, metadata, cancellationToken);
+        var response = await aiClient.ReviewPullRequestMetadataAsync(policy, metadata, language, cancellationToken);
         return response.Issues.Select(issue =>
         {
             var fingerprint = Logging.HashSha256($"{issue.Id}:{issue.Title}:{iterationId ?? 0}");

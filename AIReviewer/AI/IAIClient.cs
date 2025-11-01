@@ -14,18 +14,20 @@ public interface IAiClient
     /// </summary>
     /// <param name="policy">The review policy containing guidelines and rules.</param>
     /// <param name="fileDiff">The file diff to review.</param>
+    /// <param name="language">The language code for the review response ("en" for English, "ja" for Japanese).</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A response containing the list of issues found.</returns>
-    Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, CancellationToken cancellationToken);
+    Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reviews pull request metadata (title, description, commits) for hygiene and completeness.
     /// </summary>
     /// <param name="policy">The review policy containing metadata review guidelines.</param>
     /// <param name="metadata">The PR metadata to review.</param>
+    /// <param name="language">The language code for the review response ("en" for English, "ja" for Japanese).</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A response containing the list of issues found.</returns>
-    Task<AiReviewResponse> ReviewPullRequestMetadataAsync(string policy, PullRequestMetadata metadata, CancellationToken cancellationToken);
+    Task<AiReviewResponse> ReviewPullRequestMetadataAsync(string policy, PullRequestMetadata metadata, string language, CancellationToken cancellationToken);
 }
 
 /// <summary>

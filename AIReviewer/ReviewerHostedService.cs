@@ -46,12 +46,17 @@ public sealed class ReviewerHostedService(
             var policy = await policyLoader.LoadAsync(_options.PolicyPath, cancellationToken);
 
             var pr = await adoClient.GetPullRequestContextAsync(cancellationToken);
-            logger.LogInformation("Loaded PR {Id} - {Title} [{Source} -> {Target}]", pr.PullRequest.PullRequestId, pr.PullRequest.Title, pr.PullRequest.SourceRefName, pr.PullRequest.TargetRefName);
+            logger.LogInformation(
+                "Loaded PR {Id} - {Title} [{Source} -> {Target}]",
+                pr.PullRequest.PullRequestId,
+                pr.PullRequest.Title,
+                pr.PullRequest.SourceRefName,
+                pr.PullRequest.TargetRefName);
 
             var iteration = pr.LatestIteration;
             var diffs = await diffService.GetDiffsAsync(pr, iteration, cancellationToken);
             
-            logger.LogInformation("PR has {CommitCount} commits, {FileCount} files to review", pr.Commits.Count, diffs.Count);
+            logger.LogInformation("PR has {CommitCount} commits, {FileCount} files to review", pr.Commits.Length, diffs.Count);
 
             var reviewResult = await planner.PlanAsync(pr, iteration, diffs, policy, cancellationToken);
 
@@ -70,7 +75,7 @@ public sealed class ReviewerHostedService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "AI PR review failed: {Message}", ex.Message);
+            logger.LogError(ex, "AI PR review failed");
             Environment.ExitCode = -1;
         }
         finally

@@ -104,6 +104,16 @@ public sealed class ReviewerOptions
     public int MaxIssuesPerFile { get; set; } = 5;
 
     /// <summary>
+    /// Maximum number of commit messages to include in metadata review. Default is 10.
+    /// </summary>
+    public int MaxCommitMessagesToReview { get; set; } = 10;
+
+    /// <summary>
+    /// Maximum diff size in bytes to include in AI prompt. Larger diffs are truncated. Default is 8000 bytes.
+    /// </summary>
+    public int MaxPromptDiffBytes { get; set; } = 8000;
+
+    /// <summary>
     /// Path to the review policy markdown file. Default is "./policy/review-policy.md".
     /// </summary>
     public string PolicyPath { get; set; } = "./policy/review-policy.md";
