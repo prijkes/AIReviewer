@@ -1,8 +1,8 @@
-﻿using AIReviewer.Reviewer.Options;
+﻿using AIReviewer.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AIReviewer.Reviewer.Policy;
+namespace AIReviewer.Policy;
 
 public sealed class PolicyLoader
 {

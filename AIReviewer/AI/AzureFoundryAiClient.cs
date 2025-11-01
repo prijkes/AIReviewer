@@ -1,19 +1,19 @@
-﻿using AIReviewer.Reviewer.Diff;
-using AIReviewer.Reviewer.Options;
-using AIReviewer.Reviewer.Utils;
-using AIReviewer.Reviewer.Review;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using AIReviewer.Utils;
+using AIReviewer.Diff;
+using AIReviewer.Options;
+using AIReviewer.Review;
 using Azure;
 using Azure.AI.OpenAI;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
-namespace AIReviewer.Reviewer.AI;
+namespace AIReviewer.AI;
 
 public sealed class AzureFoundryAiClient : IAiClient
 {
     private readonly ILogger<AzureFoundryAiClient> _logger;
     private readonly ReviewerOptions _options;
-    private readonly OpenAIClient _client;
+    private readonly AzureOpenAIClient _client;
     private readonly RetryPolicyFactory _retryFactory;
 
     private const string SystemPrompt = """
@@ -45,7 +45,7 @@ public sealed class AzureFoundryAiClient : IAiClient
         _retryFactory = retryFactory;
         var endpoint = new Uri(_options.AiFoundryEndpoint);
         var credential = new AzureKeyCredential(_options.AiFoundryApiKey);
-        _client = new OpenAIClient(endpoint, credential);
+        _client = new AzureOpenAIClient(endpoint, credential);
     }
 
     public async Task<AiReviewResponse> ReviewAsync(string policy, FileDiff fileDiff, CancellationToken cancellationToken)

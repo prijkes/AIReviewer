@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AIReviewer.Reviewer.Utils;
+namespace AIReviewer.Utils;
 
 public static class JsonHelpers
 {

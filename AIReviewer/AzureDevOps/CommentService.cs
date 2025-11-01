@@ -1,10 +1,10 @@
-﻿using AIReviewer.Reviewer.AzureDevOps.Models;
-using AIReviewer.Reviewer.Review;
-using AIReviewer.Reviewer.Utils;
+﻿using AIReviewer.AzureDevOps.Models;
+using AIReviewer.Review;
+using AIReviewer.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 
-namespace AIReviewer.Reviewer.AzureDevOps;
+namespace AIReviewer.AzureDevOps;
 
 public sealed class CommentService
 {

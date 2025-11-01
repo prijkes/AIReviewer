@@ -1,10 +1,9 @@
-﻿using AIReviewer.Reviewer.Review;
-using AIReviewer.Reviewer.AzureDevOps;
-using AIReviewer.Reviewer.AzureDevOps.Models;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
+using AIReviewer.AzureDevOps.Models;
+using AIReviewer.Review;
 
-namespace AIReviewer.Reviewer.AzureDevOps;
+namespace AIReviewer.AzureDevOps;
 
 public sealed class ApprovalService
 {

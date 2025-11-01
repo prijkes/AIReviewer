@@ -1,9 +1,8 @@
-﻿using AIReviewer.Reviewer.AzureDevOps;
-using AIReviewer.Reviewer.Diff;
-using AIReviewer.Reviewer.Options;
-using AIReviewer.Reviewer.Policy;
-using AIReviewer.Reviewer.Review;
-using AIReviewer.Reviewer.Utils;
+﻿using AIReviewer.AzureDevOps;
+using AIReviewer.Diff;
+using AIReviewer.Options;
+using AIReviewer.Policy;
+using AIReviewer.Review;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

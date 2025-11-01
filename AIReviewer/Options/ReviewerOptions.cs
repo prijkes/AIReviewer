@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace AIReviewer.Reviewer.Options;
+namespace AIReviewer.Options;
 
 public sealed class ReviewerOptions
 {

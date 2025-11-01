@@ -1,4 +1,4 @@
-﻿namespace AIReviewer.Reviewer.AzureDevOps.Models;
+﻿namespace AIReviewer.AzureDevOps.Models;
 
 public enum IssueSeverity
 {

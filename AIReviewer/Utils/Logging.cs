@@ -1,4 +1,4 @@
-﻿namespace AIReviewer.Reviewer.Utils;
+﻿namespace AIReviewer.Utils;
 
 public static class Logging
 {

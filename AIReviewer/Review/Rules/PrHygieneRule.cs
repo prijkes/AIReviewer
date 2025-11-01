@@ -1,4 +1,4 @@
-﻿namespace AIReviewer.Reviewer.Review.Rules;
+﻿namespace AIReviewer.Review.Rules;
 
 public static class PrHygieneRule
 {

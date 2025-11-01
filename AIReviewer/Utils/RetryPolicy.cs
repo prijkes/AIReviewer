@@ -3,7 +3,7 @@ using Polly;
 using Polly.Contrib.WaitAndRetry;
 using Polly.Retry;
 
-namespace AIReviewer.Reviewer.Utils;
+namespace AIReviewer.Utils;
 
 public sealed class RetryPolicyFactory
 {

@@ -1,7 +1,7 @@
-﻿using AIReviewer.Reviewer.AzureDevOps.Models;
+﻿using AIReviewer.AzureDevOps.Models;
 using Microsoft.Extensions.Logging;
 
-namespace AIReviewer.Reviewer.Review;
+namespace AIReviewer.Review;
 
 public sealed class StateStore
 {

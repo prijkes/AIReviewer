@@ -1,8 +1,7 @@
-﻿using AIReviewer.Reviewer.AzureDevOps.Models;
-using AIReviewer.Reviewer.Diff;
-using AIReviewer.Reviewer.Review;
+﻿using AIReviewer.Diff;
+using AIReviewer.Review;
 
-namespace AIReviewer.Reviewer.AI;
+namespace AIReviewer.AI;
 
 public interface IAiClient
 {

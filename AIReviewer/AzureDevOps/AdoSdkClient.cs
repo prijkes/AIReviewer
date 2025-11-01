@@ -1,6 +1,6 @@
-﻿using AIReviewer.Reviewer.AzureDevOps.Models;
-using AIReviewer.Reviewer.Options;
-using AIReviewer.Reviewer.Utils;
+﻿using AIReviewer.AzureDevOps.Models;
+using AIReviewer.Options;
+using AIReviewer.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
@@ -8,7 +8,7 @@ using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.Identity;
 using Microsoft.VisualStudio.Services.WebApi;
 
-namespace AIReviewer.Reviewer.AzureDevOps;
+namespace AIReviewer.AzureDevOps;
 
 public sealed class AdoSdkClient : IDisposable
 {

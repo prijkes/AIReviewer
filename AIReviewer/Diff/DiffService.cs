@@ -1,12 +1,12 @@
-﻿using AIReviewer.Reviewer.AzureDevOps;
-using AIReviewer.Reviewer.AzureDevOps.Models;
-using AIReviewer.Reviewer.Options;
-using AIReviewer.Reviewer.Utils;
+﻿using AIReviewer.AzureDevOps;
+using AIReviewer.AzureDevOps.Models;
+using AIReviewer.Options;
+using AIReviewer.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 
-namespace AIReviewer.Reviewer.Diff;
+namespace AIReviewer.Diff;
 
 public sealed record FileDiff(string Path, string DiffText, string FileHash, bool IsBinary);
 

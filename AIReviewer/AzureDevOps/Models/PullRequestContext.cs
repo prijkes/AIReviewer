@@ -1,6 +1,6 @@
 ﻿using Microsoft.TeamFoundation.SourceControl.WebApi;
 
-namespace AIReviewer.Reviewer.AzureDevOps.Models;
+namespace AIReviewer.AzureDevOps.Models;
 
 public sealed record PullRequestContext(
     GitPullRequest PullRequest,

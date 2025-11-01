@@ -1,12 +1,12 @@
-﻿using AIReviewer.Reviewer.AI;
-using AIReviewer.Reviewer.AzureDevOps.Models;
-using AIReviewer.Reviewer.Diff;
-using AIReviewer.Reviewer.Options;
-using AIReviewer.Reviewer.Utils;
+﻿using AIReviewer.AI;
+using AIReviewer.AzureDevOps.Models;
+using AIReviewer.Diff;
+using AIReviewer.Options;
+using AIReviewer.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace AIReviewer.Reviewer.Review;
+namespace AIReviewer.Review;
 
 public sealed record PrMetadata(string Title, string Description, IReadOnlyList<string> CommitMessages);
 
