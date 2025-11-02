@@ -14,7 +14,7 @@ namespace AIReviewer.AzureDevOps;
 /// Client for interacting with Azure DevOps using the ADO SDK.
 /// Provides methods to fetch pull request context, repositories, and iteration changes.
 /// </summary>
-public sealed class AdoSdkClient : IDisposable
+public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
 {
     private readonly ILogger<AdoSdkClient> _logger;
     private readonly ReviewerOptions _options;

@@ -1,6 +1,5 @@
 using AIReviewer.Options;
-using IniParser;
-using IniParser.Model;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace AIReviewer.Utils;
@@ -30,13 +29,14 @@ public static class SettingsLoader
 
         logger?.LogInformation("Loading configuration from {IniPath}", Path.GetFullPath(iniPath));
 
-        // Parse INI file
-        var parser = new FileIniDataParser();
-        IniData iniData;
+        // Build configuration from INI file
+        IConfiguration config;
         
         try
         {
-            iniData = parser.ReadFile(iniPath);
+            config = new ConfigurationBuilder()
+                .AddIniFile(iniPath, optional: false, reloadOnChange: false)
+                .Build();
         }
         catch (Exception ex)
         {
@@ -47,30 +47,30 @@ public static class SettingsLoader
         var options = new ReviewerOptions();
         
         // [AI] section
-        options.AiFoundryDeployment = GetIniValue(iniData, "AI", "Deployment", logger);
-        options.AiTemperature = GetIniDouble(iniData, "AI", "Temperature", logger);
-        options.AiMaxTokens = GetIniInt(iniData, "AI", "MaxTokens", logger);
+        options.AiFoundryDeployment = GetIniValue(config, "AI", "Deployment", logger);
+        options.AiTemperature = GetIniDouble(config, "AI", "Temperature", logger);
+        options.AiMaxTokens = GetIniInt(config, "AI", "MaxTokens", logger);
         
         // [FunctionCalling] section
-        options.EnableFunctionCalling = GetIniBool(iniData, "FunctionCalling", "Enabled", logger);
-        options.MaxFunctionCalls = GetIniInt(iniData, "FunctionCalling", "MaxCalls", logger);
+        options.EnableFunctionCalling = GetIniBool(config, "FunctionCalling", "Enabled", logger);
+        options.MaxFunctionCalls = GetIniInt(config, "FunctionCalling", "MaxCalls", logger);
         
         // [Review] section
-        options.DryRun = GetIniBool(iniData, "Review", "DryRun", logger);
-        options.ReviewScope = GetIniValue(iniData, "Review", "Scope", logger);
-        options.WarnBudget = GetIniInt(iniData, "Review", "WarnBudget", logger);
-        options.PolicyPath = GetIniValue(iniData, "Review", "PolicyPath", logger);
+        options.DryRun = GetIniBool(config, "Review", "DryRun", logger);
+        options.ReviewScope = GetIniValue(config, "Review", "Scope", logger);
+        options.WarnBudget = GetIniInt(config, "Review", "WarnBudget", logger);
+        options.PolicyPath = GetIniValue(config, "Review", "PolicyPath", logger);
         
         // [Files] section
-        options.MaxFilesToReview = GetIniInt(iniData, "Files", "MaxFilesToReview", logger);
-        options.MaxIssuesPerFile = GetIniInt(iniData, "Files", "MaxIssuesPerFile", logger);
-        options.MaxFileBytes = GetIniSize(iniData, "Files", "MaxFileBytes", logger);
-        options.MaxDiffBytes = GetIniSize(iniData, "Files", "MaxDiffBytes", logger);
-        options.MaxPromptDiffBytes = GetIniSize(iniData, "Files", "MaxPromptDiffBytes", logger);
-        options.MaxCommitMessagesToReview = GetIniInt(iniData, "Files", "MaxCommitMessagesToReview", logger);
+        options.MaxFilesToReview = GetIniInt(config, "Files", "MaxFilesToReview", logger);
+        options.MaxIssuesPerFile = GetIniInt(config, "Files", "MaxIssuesPerFile", logger);
+        options.MaxFileBytes = GetIniSize(config, "Files", "MaxFileBytes", logger);
+        options.MaxDiffBytes = GetIniSize(config, "Files", "MaxDiffBytes", logger);
+        options.MaxPromptDiffBytes = GetIniSize(config, "Files", "MaxPromptDiffBytes", logger);
+        options.MaxCommitMessagesToReview = GetIniInt(config, "Files", "MaxCommitMessagesToReview", logger);
         
         // [Language] section
-        options.JapaneseDetectionThreshold = GetIniDouble(iniData, "Language", "JapaneseDetectionThreshold", logger);
+        options.JapaneseDetectionThreshold = GetIniDouble(config, "Language", "JapaneseDetectionThreshold", logger);
 
         logger?.LogInformation("Successfully loaded static settings from {IniPath}", iniPath);
         
@@ -86,9 +86,11 @@ public static class SettingsLoader
     /// <summary>
     /// Gets a string value from INI file.
     /// </summary>
-    private static string GetIniValue(IniData iniData, string section, string key, ILogger? logger)
+    private static string GetIniValue(IConfiguration config, string section, string key, ILogger? logger)
     {
-        var value = iniData[section][key];
+        var configKey = $"{section}:{key}";
+        var value = config[configKey];
+        
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new InvalidOperationException($"Missing required value in settings.ini: [{section}] {key}");
@@ -101,9 +103,9 @@ public static class SettingsLoader
     /// <summary>
     /// Gets an integer value from INI file.
     /// </summary>
-    private static int GetIniInt(IniData iniData, string section, string key, ILogger? logger)
+    private static int GetIniInt(IConfiguration config, string section, string key, ILogger? logger)
     {
-        var value = GetIniValue(iniData, section, key, logger);
+        var value = GetIniValue(config, section, key, logger);
         if (!int.TryParse(value, out var result))
         {
             throw new InvalidOperationException($"Invalid integer value in settings.ini: [{section}] {key} = {value}");
@@ -114,9 +116,9 @@ public static class SettingsLoader
     /// <summary>
     /// Gets a double value from INI file.
     /// </summary>
-    private static double GetIniDouble(IniData iniData, string section, string key, ILogger? logger)
+    private static double GetIniDouble(IConfiguration config, string section, string key, ILogger? logger)
     {
-        var value = GetIniValue(iniData, section, key, logger);
+        var value = GetIniValue(config, section, key, logger);
         if (!double.TryParse(value, out var result))
         {
             throw new InvalidOperationException($"Invalid decimal value in settings.ini: [{section}] {key} = {value}");
@@ -127,9 +129,9 @@ public static class SettingsLoader
     /// <summary>
     /// Gets a boolean value from INI file.
     /// </summary>
-    private static bool GetIniBool(IniData iniData, string section, string key, ILogger? logger)
+    private static bool GetIniBool(IConfiguration config, string section, string key, ILogger? logger)
     {
-        var value = GetIniValue(iniData, section, key, logger);
+        var value = GetIniValue(config, section, key, logger);
         if (!bool.TryParse(value, out var result))
         {
             throw new InvalidOperationException($"Invalid boolean value in settings.ini: [{section}] {key} = {value}. Use 'true' or 'false'.");
@@ -140,9 +142,9 @@ public static class SettingsLoader
     /// <summary>
     /// Gets a size value from INI file (supports human-readable formats like "200KB", "1.5GB").
     /// </summary>
-    private static int GetIniSize(IniData iniData, string section, string key, ILogger? logger)
+    private static int GetIniSize(IConfiguration config, string section, string key, ILogger? logger)
     {
-        var value = GetIniValue(iniData, section, key, logger);
+        var value = GetIniValue(config, section, key, logger);
         try
         {
             var bytes = SizeParser.ParseToBytes(value);

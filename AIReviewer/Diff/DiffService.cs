@@ -26,7 +26,7 @@ public sealed record ReviewFileDiff(string Path, string DiffText, string FileHas
 /// <param name="logger">Logger for diagnostic information.</param>
 /// <param name="adoClient">Client for Azure DevOps operations.</param>
 /// <param name="options">Configuration options for the reviewer.</param>
-public sealed class DiffService(ILogger<DiffService> logger, AdoSdkClient adoClient, IOptionsMonitor<ReviewerOptions> options)
+public sealed class DiffService(ILogger<DiffService> logger, IAdoSdkClient adoClient, IOptionsMonitor<ReviewerOptions> options)
 {
     private readonly ReviewerOptions _options = options.CurrentValue;
 

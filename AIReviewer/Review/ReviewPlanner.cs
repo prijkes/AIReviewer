@@ -49,6 +49,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     /// <summary>
     /// Plans and executes the complete review process for a pull request.
     /// Reviews all file diffs and PR metadata, collecting issues from the AI.
+    /// Files are reviewed in parallel for improved performance.
     /// </summary>
     /// <param name="pr">The pull request context.</param>
     /// <param name="iteration">The current PR iteration.</param>
@@ -58,10 +59,8 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     /// <returns>A <see cref="ReviewPlanResult"/> containing all identified issues and counts.</returns>
     public async Task<ReviewPlanResult> PlanAsync(PullRequestContext pr, GitPullRequestIteration iteration, IReadOnlyList<ReviewFileDiff> diffs, string policy, CancellationToken cancellationToken)
     {
-        var issues = new List<ReviewIssue>();
-
-        // Set PR context for function calling
-        contextRetriever.SetContext(pr);
+        // Set PR context for function calling (if available)
+        contextRetriever?.SetContext(pr);
 
         // Detect language from PR description
         var prDescription = pr.PullRequest.Description ?? string.Empty;
@@ -74,14 +73,53 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
             logger.LogWarning("PR has {TotalFiles} files, reviewing first {MaxFiles} only", diffs.Count, _options.MaxFilesToReview);
         }
 
-        foreach (var diff in diffs.Take(_options.MaxFilesToReview))
-        {
-            if (diff.DiffText.Length > _options.MaxDiffBytes)
+        // Filter and prepare diffs for review
+        var diffsToReview = diffs
+            .Take(_options.MaxFilesToReview)
+            .Where(diff =>
             {
-                logger.LogWarning("Skipping large diff {Path} ({Size} bytes)", diff.Path, diff.DiffText.Length);
-                continue;
-            }
+                if (diff.DiffText.Length > _options.MaxDiffBytes)
+                {
+                    logger.LogWarning("Skipping large diff {Path} ({Size} bytes)", diff.Path, diff.DiffText.Length);
+                    return false;
+                }
+                return true;
+            })
+            .ToList();
 
+        // Review files in parallel
+        var reviewTasks = diffsToReview.Select(diff => 
+            ReviewFileAsync(diff, policy, language, iteration.Id ?? 0, cancellationToken));
+
+        var fileResults = await Task.WhenAll(reviewTasks);
+
+        // Flatten all issues
+        var issues = fileResults.SelectMany(r => r).ToList();
+
+        // Review metadata
+        var metadataIssues = await ReviewMetadataAsync(pr, policy, language, iteration.Id, cancellationToken);
+        issues.AddRange(metadataIssues);
+
+        var errorCount = issues.Count(i => i.Severity == IssueSeverity.Error);
+        var warningCount = issues.Count(i => i.Severity == IssueSeverity.Warn);
+
+        return new ReviewPlanResult(issues, errorCount, warningCount, _options.WarnBudget);
+    }
+
+    /// <summary>
+    /// Reviews a single file and returns the identified issues.
+    /// </summary>
+    private async Task<List<ReviewIssue>> ReviewFileAsync(
+        ReviewFileDiff diff, 
+        string policy, 
+        string language, 
+        int iterationId, 
+        CancellationToken cancellationToken)
+    {
+        var issues = new List<ReviewIssue>();
+
+        try
+        {
             var aiResponse = await aiClient.ReviewAsync(policy, diff, language, cancellationToken);
             
             if (aiResponse.Issues.Count > _options.MaxIssuesPerFile)
@@ -92,7 +130,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
 
             foreach (var issue in aiResponse.Issues.Take(_options.MaxIssuesPerFile))
             {
-                var fingerprint = ComputeFingerprint(diff, iteration.Id ?? 0, issue);
+                var fingerprint = ComputeFingerprint(diff, iterationId, issue);
                 issues.Add(new ReviewIssue
                 {
                     Id = issue.Id,
@@ -108,14 +146,12 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
                 });
             }
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to review file {Path}, continuing with other files", diff.Path);
+        }
 
-        var metadataIssues = await ReviewMetadataAsync(pr, policy, language, iteration.Id, cancellationToken);
-        issues.AddRange(metadataIssues);
-
-        var errorCount = issues.Count(i => i.Severity == IssueSeverity.Error);
-        var warningCount = issues.Count(i => i.Severity == IssueSeverity.Warn);
-
-        return new ReviewPlanResult(issues, errorCount, warningCount, _options.WarnBudget);
+        return issues;
     }
 
     /// <summary>
