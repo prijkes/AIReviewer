@@ -1,26 +1,21 @@
-using System.Diagnostics;
+using LibGit2Sharp;
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Logging;
 
 namespace AIReviewer.AzureDevOps;
 
 /// <summary>
-/// Provides local filesystem and git command access for file operations.
+/// Provides local git repository access using LibGit2Sharp.
 /// Used when LOCAL_REPO_PATH is configured to avoid Azure DevOps API calls.
 /// </summary>
-public sealed class LocalGitProvider
+public sealed class LocalGitProvider : IDisposable
 {
     private readonly ILogger<LocalGitProvider> _logger;
     private readonly string _repoPath;
+    private readonly Repository _repository;
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="LocalGitProvider"/> class.
-    /// </summary>
-    /// <param name="logger">Logger for diagnostic information.</param>
-    /// <param name="repoPath">Path to the local git repository.</param>
-    /// <exception cref="DirectoryNotFoundException">Thrown when repository path doesn't exist.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when path is not a git repository.</exception>
     public LocalGitProvider(ILogger<LocalGitProvider> logger, string repoPath)
     {
         _logger = logger;
@@ -31,264 +26,329 @@ public sealed class LocalGitProvider
             throw new DirectoryNotFoundException($"Local repository path does not exist: {_repoPath}");
         }
 
-        if (!Directory.Exists(Path.Combine(_repoPath, ".git")))
+        try
         {
-            throw new InvalidOperationException($"Path is not a git repository (no .git directory): {_repoPath}");
+            _repository = new Repository(_repoPath);
+            _logger.LogInformation("Local git provider initialized at: {RepoPath}", _repoPath);
         }
-
-        _logger.LogInformation("Local git provider initialized at: {RepoPath}", _repoPath);
+        catch (RepositoryNotFoundException ex)
+        {
+            throw new InvalidOperationException(
+                $"Path is not a git repository: {_repoPath}. Ensure the directory contains a .git folder.", ex);
+        }
     }
 
     /// <summary>
     /// Gets the content of a file at a specific version (commit or branch).
     /// </summary>
-    /// <param name="filePath">The path to the file relative to repository root.</param>
-    /// <param name="versionDescriptor">The version (commit SHA or branch name).</param>
-    /// <returns>The file content as a string, or null if file doesn't exist.</returns>
-    public async Task<string?> GetFileContentAsync(string filePath, string versionDescriptor)
+    public Task<string?> GetFileContentAsync(string filePath, string versionDescriptor)
+    {
+        return Task.Run(() => GetFileContent(filePath, versionDescriptor));
+    }
+
+    private string? GetFileContent(string filePath, string versionDescriptor)
     {
         try
         {
-            // Clean the file path
-            filePath = filePath.TrimStart('/').Replace('\\', '/');
+            filePath = NormalizePath(filePath);
             
-            // Use git show to get file content at specific version
-            var gitCommand = $"show {versionDescriptor}:{filePath}";
-            var result = await RunGitCommandAsync(gitCommand);
-            
-            if (result.ExitCode == 0)
+            var commit = ResolveCommit(versionDescriptor);
+            if (commit == null)
             {
-                return result.Output;
+                _logger.LogWarning("Failed to resolve version: {Version}", versionDescriptor);
+                return null;
             }
 
-            _logger.LogWarning("Failed to get file content for {FilePath} at {Version}: {Error}", 
-                filePath, versionDescriptor, result.Error);
-            return null;
+            var treeEntry = commit[filePath];
+            if (treeEntry?.TargetType != TreeEntryTargetType.Blob)
+            {
+                _logger.LogWarning("File not found or not a blob: {FilePath} at {Version}", filePath, versionDescriptor);
+                return null;
+            }
+
+            var blob = (Blob)treeEntry.Target;
+            var content = blob.GetContentText();
+            
+            _logger.LogDebug("Retrieved {Size} bytes for {FilePath}", content.Length, filePath);
+            return content;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting file content for {FilePath} at {Version}", filePath, versionDescriptor);
+            _logger.LogError(ex, "Error getting file: {FilePath} at {Version}", filePath, versionDescriptor);
             return null;
         }
     }
 
     /// <summary>
-    /// Searches the codebase for files containing specific text using git grep.
+    /// Searches the codebase for files containing specific text using parallel processing.
     /// </summary>
-    /// <param name="searchTerm">The text to search for.</param>
-    /// <param name="versionDescriptor">The version (branch name or commit SHA) to search in.</param>
-    /// <param name="filePattern">Optional file pattern filter (e.g., "*.cs").</param>
-    /// <param name="maxResults">Maximum number of results to return.</param>
-    /// <returns>List of search results with file path, line number, and context.</returns>
-    public async Task<List<CodeSearchResult>> SearchCodeAsync(
+    public Task<List<CodeSearchResult>> SearchCodeAsync(
         string searchTerm,
         string versionDescriptor,
         string? filePattern,
         int maxResults)
     {
-        var results = new List<CodeSearchResult>();
-
-        try
-        {
-            // Build git grep command
-            var gitCommand = new StringBuilder("grep -n -i");
-            
-            // Add context lines (1 before and 1 after)
-            gitCommand.Append(" -C 1");
-            
-            // Add the search term (escaped)
-            gitCommand.Append($" \"{EscapeGitArgument(searchTerm)}\"");
-            
-            // Add version
-            gitCommand.Append($" {versionDescriptor}");
-            
-            // Add file pattern if specified
-            if (!string.IsNullOrWhiteSpace(filePattern))
-            {
-                gitCommand.Append($" -- \"{filePattern}\"");
-            }
-
-            var result = await RunGitCommandAsync(gitCommand.ToString());
-            
-            if (result.ExitCode != 0 && !string.IsNullOrEmpty(result.Error))
-            {
-                // Exit code 1 just means no matches found, which is valid
-                if (result.ExitCode != 1)
-                {
-                    _logger.LogWarning("Git grep failed: {Error}", result.Error);
-                }
-                return results;
-            }
-
-            // Parse git grep output: format is "file:line:content"
-            var lines = result.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            var currentFile = string.Empty;
-            var contextLines = new StringBuilder();
-            var lineNumber = 0;
-
-            foreach (var line in lines)
-            {
-                if (results.Count >= maxResults) break;
-
-                // Parse git grep output
-                var match = Regex.Match(line, @"^([^:]+):(\d+):(.*)$");
-                if (match.Success)
-                {
-                    var file = match.Groups[1].Value.Trim();
-                    var lineNum = int.Parse(match.Groups[2].Value);
-                    var content = match.Groups[3].Value;
-
-                    // If this is a new match (not context), save previous and start new
-                    if (file != currentFile || Math.Abs(lineNum - lineNumber) > 2)
-                    {
-                        if (contextLines.Length > 0 && !string.IsNullOrEmpty(currentFile))
-                        {
-                            results.Add(new CodeSearchResult(currentFile, lineNumber, contextLines.ToString()));
-                        }
-
-                        currentFile = file;
-                        lineNumber = lineNum;
-                        contextLines.Clear();
-                    }
-
-                    contextLines.AppendLine(content);
-                    lineNumber = lineNum;
-                }
-            }
-
-            // Add the last result
-            if (contextLines.Length > 0 && !string.IsNullOrEmpty(currentFile))
-            {
-                results.Add(new CodeSearchResult(currentFile, lineNumber, contextLines.ToString()));
-            }
-
-            _logger.LogDebug("Search found {Count} results for '{SearchTerm}'", results.Count, searchTerm);
-            return results.Take(maxResults).ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error searching codebase for '{SearchTerm}'", searchTerm);
-            return results;
-        }
+        return Task.Run(() => SearchCode(searchTerm, versionDescriptor, filePattern, maxResults));
     }
 
     /// <summary>
-    /// Gets the commit history for a specific file using git log.
+    /// Gets the commit history for a specific file.
     /// </summary>
-    /// <param name="filePath">The path to the file relative to repository root.</param>
-    /// <param name="versionDescriptor">The version (branch name) to get history from.</param>
-    /// <param name="maxCommits">Maximum number of commits to return.</param>
-    /// <returns>List of commits in "SHA: Message (Author, Date)" format.</returns>
-    public async Task<List<string>> GetFileHistoryAsync(
+    public Task<List<string>> GetFileHistoryAsync(
         string filePath,
         string versionDescriptor,
         int maxCommits)
     {
-        var results = new List<string>();
+        return Task.Run(() => GetFileHistory(filePath, versionDescriptor, maxCommits));
+    }
 
+    private List<CodeSearchResult> SearchCode(
+        string searchTerm,
+        string versionDescriptor,
+        string? filePattern,
+        int maxResults)
+    {
         try
         {
-            // Clean the file path
-            filePath = filePath.TrimStart('/').Replace('\\', '/');
-
-            // Build git log command
-            var gitCommand = $"log {versionDescriptor} -n {maxCommits} --pretty=format:\"%H|%an|%ad|%s\" --date=short -- \"{filePath}\"";
-            
-            var result = await RunGitCommandAsync(gitCommand);
-            
-            if (result.ExitCode != 0)
+            var commit = ResolveCommit(versionDescriptor);
+            if (commit == null)
             {
-                _logger.LogWarning("Failed to get file history for {FilePath}: {Error}", filePath, result.Error);
-                return results;
+                _logger.LogWarning("Failed to resolve version: {Version}", versionDescriptor);
+                return [];
             }
 
-            // Parse git log output
-            var lines = result.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var line in lines)
-            {
-                var parts = line.Split('|');
-                if (parts.Length >= 4)
-                {
-                    var sha = parts[0].Substring(0, Math.Min(8, parts[0].Length)); // Short SHA
-                    var author = parts[1];
-                    var date = parts[2];
-                    var message = parts[3];
-                    
-                    results.Add($"{sha}: {message} ({author}, {date})");
-                }
-            }
+            var filePatternRegex = CompileFilePattern(filePattern);
+            var allFiles = CollectFiles(commit.Tree);
 
-            _logger.LogDebug("Found {Count} commits for {FilePath}", results.Count, filePath);
+            _logger.LogDebug("Searching {FileCount} files in parallel for: '{SearchTerm}'", 
+                allFiles.Count, searchTerm);
+
+            var results = SearchFilesInParallel(allFiles, searchTerm, filePatternRegex, maxResults);
+            
+            _logger.LogInformation("Found {ResultCount} results for '{SearchTerm}' (searched {FileCount} files)", 
+                results.Count, searchTerm, allFiles.Count);
+            
             return results;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting file history for {FilePath}", filePath);
-            return results;
+            _logger.LogError(ex, "Error searching for: '{SearchTerm}'", searchTerm);
+            return [];
         }
     }
 
-    /// <summary>
-    /// Runs a git command in the repository directory.
-    /// </summary>
-    /// <param name="arguments">Git command arguments (without 'git' prefix).</param>
-    /// <returns>Command result with exit code, output, and error.</returns>
-    private async Task<GitCommandResult> RunGitCommandAsync(string arguments)
+    private List<CodeSearchResult> SearchFilesInParallel(
+        List<FileEntry> files,
+        string searchTerm,
+        Regex? filePattern,
+        int maxResults)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "git",
-            Arguments = arguments,
-            WorkingDirectory = _repoPath,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var results = new ConcurrentBag<CodeSearchResult>();
+        var cancellation = new CancellationTokenSource();
 
-        using var process = new Process { StartInfo = startInfo };
+        Parallel.ForEach(
+            files,
+            new ParallelOptions 
+            { 
+                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                CancellationToken = cancellation.Token
+            },
+            (file, state) =>
+            {
+                try
+                {
+                    // Early exit if we have enough results
+                    if (results.Count >= maxResults)
+                    {
+                        cancellation.Cancel();
+                        return;
+                    }
+
+                    // Apply file pattern filter
+                    if (filePattern != null && !filePattern.IsMatch(file.Path)) return;
+
+                    // Skip binary files
+                    if (file.Blob.IsBinary) return;
+
+                    // Search file content
+                    var fileResults = SearchFileContent(file, searchTerm, maxResults - results.Count);
+                    foreach (var result in fileResults)
+                    {
+                        if (results.Count < maxResults) results.Add(result);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to search: {FilePath}", file.Path);
+                }
+            });
+
+        return [.. results
+            .Take(maxResults)
+            .OrderBy(r => r.FilePath)
+            .ThenBy(r => r.LineNumber)];
+    }
+
+    private static List<CodeSearchResult> SearchFileContent(FileEntry file, string searchTerm, int maxMatches)
+    {
+        var results = new List<CodeSearchResult>();
+        var content = file.Blob.GetContentText();
+        var lines = content.Split('\n');
+
+        for (int i = 0; i < lines.Length && results.Count < maxMatches; i++)
+        {
+            if (lines[i].Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            {
+                var context = BuildContext(lines, i);
+                results.Add(new CodeSearchResult(file.Path, i + 1, context));
+            }
+        }
+
+        return results;
+    }
+
+    private static string BuildContext(string[] lines, int lineIndex)
+    {
+        var context = new StringBuilder();
         
-        var outputBuilder = new StringBuilder();
-        var errorBuilder = new StringBuilder();
+        if (lineIndex > 0)
+            context.AppendLine(lines[lineIndex - 1]);
+        
+        context.AppendLine(lines[lineIndex]);
+        
+        if (lineIndex < lines.Length - 1)
+            context.AppendLine(lines[lineIndex + 1]);
 
-        process.OutputDataReceived += (sender, e) =>
-        {
-            if (e.Data != null) outputBuilder.AppendLine(e.Data);
-        };
-
-        process.ErrorDataReceived += (sender, e) =>
-        {
-            if (e.Data != null) errorBuilder.AppendLine(e.Data);
-        };
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-
-        await process.WaitForExitAsync();
-
-        return new GitCommandResult(
-            process.ExitCode,
-            outputBuilder.ToString(),
-            errorBuilder.ToString()
-        );
+        return context.ToString();
     }
 
-    /// <summary>
-    /// Escapes special characters in git command arguments.
-    /// </summary>
-    private static string EscapeGitArgument(string argument)
+    private static List<FileEntry> CollectFiles(Tree tree)
     {
-        return argument.Replace("\"", "\\\"").Replace("$", "\\$");
+        var files = new List<FileEntry>();
+        CollectFilesRecursive(tree, "", files);
+        return files;
     }
 
-    /// <summary>
-    /// Result of a git command execution.
-    /// </summary>
-    private sealed record GitCommandResult(int ExitCode, string Output, string Error);
+    private static void CollectFilesRecursive(Tree tree, string currentPath, List<FileEntry> files)
+    {
+        foreach (var entry in tree)
+        {
+            var fullPath = string.IsNullOrEmpty(currentPath)
+                ? entry.Name
+                : $"{currentPath}/{entry.Name}";
+
+            switch (entry.TargetType)
+            {
+                case TreeEntryTargetType.Tree:
+                    CollectFilesRecursive((Tree)entry.Target, fullPath, files);
+                    break;
+                
+                case TreeEntryTargetType.Blob:
+                    files.Add(new FileEntry(fullPath, (Blob)entry.Target));
+                    break;
+            }
+        }
+    }
+
+    private List<string> GetFileHistory(string filePath, string versionDescriptor, int maxCommits)
+    {
+        try
+        {
+            filePath = NormalizePath(filePath);
+
+            var commit = ResolveCommit(versionDescriptor);
+            if (commit == null)
+            {
+                _logger.LogWarning("Failed to resolve version: {Version}", versionDescriptor);
+                return [];
+            }
+
+            var filter = new CommitFilter
+            {
+                IncludeReachableFrom = commit,
+                SortBy = CommitSortStrategies.Time
+            };
+
+            var commits = _repository.Commits
+                .QueryBy(filePath, filter)
+                .Take(maxCommits)
+                .Select(FormatCommit)
+                .ToList();
+
+            _logger.LogDebug("Found {Count} commits for: {FilePath}", commits.Count, filePath);
+            return commits;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting history for: {FilePath}", filePath);
+            return [];
+        }
+    }
+
+    private static string FormatCommit(LogEntry entry)
+    {
+        var commit = entry.Commit;
+        var shortSha = commit.Sha[..Math.Min(8, commit.Sha.Length)];
+        var author = commit.Author.Name;
+        var date = commit.Author.When.ToString("yyyy-MM-dd");
+        var message = commit.MessageShort;
+
+        return $"{shortSha}: {message} ({author}, {date})";
+    }
+
+    private Commit? ResolveCommit(string versionDescriptor)
+    {
+        try
+        {
+            var version = versionDescriptor.StartsWith("refs/heads/")
+                ? versionDescriptor["refs/heads/".Length..]
+                : versionDescriptor;
+
+            // Try direct lookup
+            if (_repository.Lookup(version) is Commit commit)
+                return commit;
+
+            if (_repository.Lookup(version) is TagAnnotation tag)
+                return tag.Target as Commit;
+
+            // Try branch lookup
+            var branch = _repository.Branches[version];
+            if (branch != null)
+                return branch.Tip;
+
+            _logger.LogWarning("Could not resolve version: {Version}", versionDescriptor);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resolving version: {Version}", versionDescriptor);
+            return null;
+        }
+    }
+
+    private static Regex? CompileFilePattern(string? pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+            return null;
+
+        var regexPattern = "^" + Regex.Escape(pattern)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".") + "$";
+
+        return new Regex(regexPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return path.TrimStart('/').Replace('\\', '/');
+    }
+
+    public void Dispose()
+    {
+        _repository?.Dispose();
+    }
+
+    private record FileEntry(string Path, Blob Blob);
 }
 
-/// <summary>
-/// Represents a code search result with file path, line number, and surrounding context.
-/// </summary>
 public sealed record CodeSearchResult(string FilePath, int LineNumber, string Context);

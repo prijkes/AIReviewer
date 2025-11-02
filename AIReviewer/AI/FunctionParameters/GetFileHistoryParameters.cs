@@ -16,7 +16,7 @@ public class GetFileHistoryParameters
     public string FilePath { get; set; } = string.Empty;
 
     /// <summary>
-    /// Maximum number of commits to return (default: 5, max: 10)
+    /// Maximum number of commits to return (default: 5, max: 30)
     /// </summary>
     [JsonPropertyName("maxCommits")]
     public int? MaxCommits { get; set; }

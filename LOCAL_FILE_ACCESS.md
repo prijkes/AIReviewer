@@ -7,11 +7,12 @@ AIReviewer now supports **local filesystem access** for file operations, dramati
 ## How It Works
 
 When `LOCAL_REPO_PATH` is configured, AIReviewer will:
-- ✅ Use local `git` commands instead of Azure DevOps REST API
-- ✅ Read file contents using `git show`
-- ✅ Search codebase using `git grep` (extremely fast)
-- ✅ Get file history using `git log`
+- ✅ Use **LibGit2Sharp** (.NET library) instead of Azure DevOps REST API
+- ✅ Read file contents directly from git objects (blobs)
+- ✅ Search codebase by traversing commit tree (fast in-memory)
+- ✅ Get file history using LibGit2Sharp commit queries
 - ✅ **No API fallback** - failures are fatal errors (ensures pipeline catches issues early)
+- ✅ **No external processes** - Pure .NET library, no git CLI required
 
 ## Configuration
 
@@ -106,14 +107,9 @@ steps:
 
 ## Requirements
 
-### Git Must Be Available
+### LibGit2Sharp Library
 
-The system uses `git` CLI commands, so git must be installed and available in PATH:
-
-```bash
-# Verify git is available
-git --version
-```
+The system uses **LibGit2Sharp** (NuGet package), a pure .NET implementation of Git. No external git CLI is required!
 
 ### Valid Git Repository
 
@@ -183,39 +179,62 @@ InvalidOperationException: File not found in local repository: src/NewFile.cs at
 
 **Solution:** File may not exist at the specified commit/branch. Verify the ref exists.
 
-## Local Git Operations
+## LibGit2Sharp Operations
 
-### File Content: `git show`
+### File Content: Blob Access
 
-```bash
-git show main:src/Program.cs
-git show abc123:src/OldFile.cs
-```
-
-### Code Search: `git grep`
-
-```bash
-git grep -n -i "search term" main
-git grep -n -i "search term" main -- "*.cs"
+```csharp
+// Reads file directly from git object database
+var commit = repository.Lookup<Commit>("main");
+var blob = (Blob)commit["src/Program.cs"].Target;
+var content = blob.GetContentText();
 ```
 
 Benefits:
-- Searches entire repository in milliseconds
-- Returns line numbers and context
+- Direct access to git objects (very fast)
+- No process spawning overhead
+- Works in any environment (Windows, Linux, macOS)
+
+### Code Search: Parallel Tree Traversal
+
+```csharp
+// Collects all files first
+var allFiles = new List<(TreeEntry entry, string path)>();
+CollectAllFiles(commit.Tree, "", allFiles);
+
+// Parallel search using all CPU cores
+Parallel.ForEach(allFiles, new ParallelOptions 
+{ 
+    MaxDegreeOfParallelism = Environment.ProcessorCount 
+},
+(fileInfo, state) => {
+    // Search file content in parallel
+    // Thread-safe ConcurrentBag for results
+});
+```
+
+Benefits:
+- **Multi-core processing** - Uses all available CPU cores
+- **Extremely fast** - Parallel I/O from SSD
+- In-memory tree traversal
 - Supports file patterns
+- Automatically skips binary files
+- Thread-safe result collection
 - No API rate limits
 
-### File History: `git log`
+### File History: Commit Queries
 
-```bash
-git log main -n 5 --pretty=format:"%H|%an|%ad|%s" --date=short -- src/Program.cs
+```csharp
+// Uses LibGit2Sharp commit filter
+var filter = new CommitFilter { IncludeReachableFrom = commit };
+var commits = repository.Commits.QueryBy(filePath, filter);
 ```
 
 Returns:
 - Commit SHA
-- Author
-- Date  
+- Author name and date
 - Commit message
+- All from git object database
 
 ## Troubleshooting
 
@@ -241,21 +260,23 @@ You'll see logs like:
 [Info] Local git provider initialized at: /repo/path
 ```
 
-### Verify Git Commands Manually
+### Test LibGit2Sharp Access
 
-Test the commands AIReviewer uses:
+Verify the repository is accessible:
+
+```csharp
+using LibGit2Sharp;
+
+// Test opening repository
+using var repo = new Repository("/path/to/your/repo");
+Console.WriteLine($"Repository loaded: {repo.Info.Path}");
+Console.WriteLine($"Branches: {repo.Branches.Count()}");
+```
+
+Or simply check the directory structure:
 
 ```bash
-cd /path/to/your/repo
-
-# Test file content
-git show main:src/Program.cs
-
-# Test search
-git grep -n -i "MyClass" main -- "*.cs"
-
-# Test history
-git log main -n 5 --pretty=format:"%H|%an|%ad|%s" --date=short -- src/Program.cs
+ls -la /path/to/your/repo/.git  # Should exist
 ```
 
 ### Check Checkout Configuration

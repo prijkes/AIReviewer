@@ -9,7 +9,7 @@ namespace AIReviewer.AI;
 /// Provides context retrieval functions that can be called by the AI during code review.
 /// These functions allow the AI to gather additional information about the codebase.
 /// </summary>
-public sealed class ReviewContextRetriever(ILogger<ReviewContextRetriever> logger, AdoSdkClient adoClient)
+public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetriever> logger, AdoSdkClient adoClient)
 {
     private PullRequestContext? _currentPrContext;
 
@@ -37,10 +37,8 @@ public sealed class ReviewContextRetriever(ILogger<ReviewContextRetriever> logge
             logger.LogDebug("AI requested full file content: {FilePath}", filePath);
             
             var item = await adoClient.GetFileContentAsync(
-                _currentPrContext!.Repository.Id,
                 filePath,
-                _currentPrContext.PullRequest.TargetRefName,
-                CancellationToken.None);
+                _currentPrContext!.PullRequest.TargetRefName);
 
             if (item?.Content == null)
             {
@@ -80,10 +78,8 @@ public sealed class ReviewContextRetriever(ILogger<ReviewContextRetriever> logge
                     : $"refs/heads/{commitOrBranch}";
             
             var item = await adoClient.GetFileContentAsync(
-                _currentPrContext!.Repository.Id,
                 filePath,
-                versionDescriptor,
-                CancellationToken.None);
+                versionDescriptor);
 
             if (item?.Content == null)
             {
@@ -107,23 +103,25 @@ public sealed class ReviewContextRetriever(ILogger<ReviewContextRetriever> logge
     /// </summary>
     /// <param name="searchTerm">The text to search for (e.g., "class MyClass", "void MyMethod")</param>
     /// <param name="filePattern">Optional file pattern filter (e.g., "*.cs", "*.csproj")</param>
-    /// <param name="maxResults">Maximum number of results to return (default: 10)</param>
+    /// <param name="maxResults">Maximum number of results to return (default: 10, max: 100)</param>
     /// <returns>List of files and locations where the term was found</returns>
     public async Task<string> SearchCodebaseAsync(string searchTerm, string? filePattern = null, int maxResults = 10)
     {
         EnsureContextSet();
         
+        // Clamp to reasonable limits
+        maxResults = Math.Clamp(maxResults, 1, 100);
+        
         try
         {
-            logger.LogDebug("AI searching codebase: '{SearchTerm}' (pattern: {Pattern})", searchTerm, filePattern ?? "all");
+            logger.LogDebug("AI searching codebase: '{SearchTerm}' (pattern: {Pattern}, maxResults: {MaxResults})", 
+                searchTerm, filePattern ?? "all", maxResults);
             
             var searchResults = await adoClient.SearchCodeAsync(
-                _currentPrContext!.Repository.Id,
                 searchTerm,
-                _currentPrContext.PullRequest.TargetRefName,
+                _currentPrContext!.PullRequest.TargetRefName,
                 filePattern,
-                maxResults,
-                CancellationToken.None);
+                maxResults);
 
             if (searchResults.Count == 0)
             {
@@ -178,19 +176,17 @@ public sealed class ReviewContextRetriever(ILogger<ReviewContextRetriever> logge
             sb.AppendLine($"Related files for {filePath}:");
 
             // Extract namespace from the file
-            var namespaceMatch = System.Text.RegularExpressions.Regex.Match(fileContent, @"namespace\s+([\w\.]+)");
+            var namespaceMatch = NamespaceRegex().Match(fileContent);
             if (namespaceMatch.Success)
             {
                 var namespaceName = namespaceMatch.Groups[1].Value;
                 sb.AppendLine($"\nFiles in same namespace '{namespaceName}':");
                 
                 var sameNamespaceFiles = await adoClient.SearchCodeAsync(
-                    _currentPrContext!.Repository.Id,
                     $"namespace {namespaceName}",
-                    _currentPrContext.PullRequest.TargetRefName,
+                    _currentPrContext!.PullRequest.TargetRefName,
                     "*.cs",
-                    5,
-                    CancellationToken.None);
+                    5);
 
                 foreach (var file in sameNamespaceFiles.Where(f => f.FilePath != filePath))
                 {
@@ -200,12 +196,10 @@ public sealed class ReviewContextRetriever(ILogger<ReviewContextRetriever> logge
                 // Find files that import this namespace
                 sb.AppendLine($"\nFiles importing '{namespaceName}':");
                 var importingFiles = await adoClient.SearchCodeAsync(
-                    _currentPrContext!.Repository.Id,
                     $"using {namespaceName}",
-                    _currentPrContext.PullRequest.TargetRefName,
+                    _currentPrContext!.PullRequest.TargetRefName,
                     "*.cs",
-                    5,
-                    CancellationToken.None);
+                    5);
 
                 foreach (var file in importingFiles.Where(f => f.FilePath != filePath))
                 {
@@ -228,22 +222,23 @@ public sealed class ReviewContextRetriever(ILogger<ReviewContextRetriever> logge
     /// Useful for understanding how a file has evolved and who has worked on it.
     /// </summary>
     /// <param name="filePath">The path to the file</param>
-    /// <param name="maxCommits">Maximum number of commits to return (default: 5)</param>
+    /// <param name="maxCommits">Maximum number of commits to return (default: 5, max: 30)</param>
     /// <returns>List of commits that modified this file</returns>
     public async Task<string> GetFileHistoryAsync(string filePath, int maxCommits = 5)
     {
         EnsureContextSet();
         
+        // Clamp to reasonable limits
+        maxCommits = Math.Clamp(maxCommits, 1, 30);
+        
         try
         {
-            logger.LogDebug("AI requested file history: {FilePath} (max: {Max})", filePath, maxCommits);
+            logger.LogDebug("AI requested file history: {FilePath} (maxCommits: {MaxCommits})", filePath, maxCommits);
             
             var commits = await adoClient.GetFileHistoryAsync(
-                _currentPrContext!.Repository.Id,
                 filePath,
-                _currentPrContext.PullRequest.TargetRefName,
-                maxCommits,
-                CancellationToken.None);
+                _currentPrContext!.PullRequest.TargetRefName,
+                maxCommits);
 
             if (commits.Count == 0)
             {
@@ -255,10 +250,22 @@ public sealed class ReviewContextRetriever(ILogger<ReviewContextRetriever> logge
             
             foreach (var commit in commits)
             {
-                var date = commit.Committer?.Date ?? commit.Author?.Date;
-                var author = commit.Committer?.Name ?? commit.Author?.Name ?? "Unknown";
-                sb.AppendLine($"\n{commit.CommitId?[..8]} - {author} ({date:yyyy-MM-dd})");
-                sb.AppendLine($"  {commit.Comment}");
+                // When using LocalGitProvider, the Comment contains the full formatted string
+                // Format: "SHA: Message (Author, Date)"
+                // When using API, we format it from individual fields
+                if (commit.CommitId != null)
+                {
+                    // API response with full commit details
+                    var date = commit.Committer?.Date ?? commit.Author?.Date;
+                    var author = commit.Committer?.Name ?? commit.Author?.Name ?? "Unknown";
+                    sb.AppendLine($"\n{commit.CommitId[..Math.Min(8, commit.CommitId.Length)]} - {author} ({date:yyyy-MM-dd})");
+                    sb.AppendLine($"  {commit.Comment}");
+                }
+                else
+                {
+                    // Local provider response (already formatted in Comment field)
+                    sb.AppendLine($"\n{commit.Comment}");
+                }
             }
 
             logger.LogInformation("Retrieved {Count} commits for {FilePath}", commits.Count, filePath);
@@ -278,9 +285,7 @@ public sealed class ReviewContextRetriever(ILogger<ReviewContextRetriever> logge
             throw new InvalidOperationException("Pull request context must be set before calling context retrieval functions.");
         }
     }
-}
 
-/// <summary>
-/// Represents a search result from the codebase.
-/// </summary>
-public sealed record CodeSearchResult(string FilePath, int LineNumber, string Context);
+    [System.Text.RegularExpressions.GeneratedRegex(@"namespace\s+([\w\.]+)")]
+    private static partial System.Text.RegularExpressions.Regex NamespaceRegex();
+}

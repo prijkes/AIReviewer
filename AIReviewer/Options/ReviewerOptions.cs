@@ -134,8 +134,10 @@ public sealed class ReviewerOptions
     /// Local repository path for accessing files directly from the filesystem instead of Azure DevOps API.
     /// When running in Azure Pipelines, this should be set to $(Build.SourcesDirectory).
     /// This dramatically reduces API calls and avoids rate limiting for large codebases.
+    /// REQUIRED: All git file operations will use local filesystem.
     /// </summary>
-    public string? LocalRepoPath { get; set; }
+    [Required]
+    public string LocalRepoPath { get; set; } = string.Empty;
 
     /// <summary>
     /// Normalizes option values by applying default values where needed.

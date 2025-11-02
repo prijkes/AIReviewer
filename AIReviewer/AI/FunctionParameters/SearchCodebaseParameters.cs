@@ -22,7 +22,7 @@ public class SearchCodebaseParameters
     public string? FilePattern { get; set; }
 
     /// <summary>
-    /// Maximum number of results to return (default: 10, max: 20)
+    /// Maximum number of results to return (default: 10, max: 100)
     /// </summary>
     [JsonPropertyName("maxResults")]
     public int? MaxResults { get; set; }
