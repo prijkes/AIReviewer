@@ -75,57 +75,68 @@ Add the provided `azure-pipeline.yaml` to your repository and configure the requ
 
 ## Configuration
 
-All configuration can be provided via environment variables or `appsettings.json`. Environment variables take precedence.
+AIReviewer uses a self-documenting configuration system:
 
-### Required Configuration
+1. **settings.ini** - Static defaults with detailed inline documentation (version controlled)
+2. **Environment variables** - Override defaults + provide dynamic values (highest priority)
+3. **.env file** - Local development overrides (gitignored)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `ADO_COLLECTION_URL` | Azure DevOps organization URL | `https://dev.azure.com/MyOrg` |
-| `ADO_PROJECT` | Azure DevOps project name | `MyProject` |
-| `ADO_REPO_NAME` or `ADO_REPO_ID` | Repository name or GUID | `MyRepo` or `abc123...` |
-| `ADO_ACCESS_TOKEN` | Azure DevOps PAT with Code (Read & Write) permissions | `your-pat-token` |
-| `AI_FOUNDRY_ENDPOINT` | Azure OpenAI or AI Foundry endpoint URL | `https://your.openai.azure.com` |
-| `AI_FOUNDRY_API_KEY` | API key for Azure AI service | `your-api-key` |
+### Quick Start Configuration
 
-### Optional Configuration
+**Step 1:** Review and customize `AIReviewer/settings.ini`
+```ini
+[AI]
+Deployment = o4-mini    # Change to gpt-4 for better quality
+Temperature = 0.2       # Keep low for consistent reviews
+MaxTokens = 2000        # Increase for more detailed feedback
 
-#### Pull Request Selection
+[Review]
+DryRun = false         # Set to true for testing
+WarnBudget = 3         # Adjust based on your standards
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ADO_PR_ID` | Auto-detected | Specific PR ID to review. If not set, attempts to detect from `BUILD_SOURCEVERSION` in pipeline context |
-| `BUILD_SOURCEVERSION` | - | Commit SHA to infer PR ID (Azure Pipelines provides this automatically) |
+# ... see settings.ini for all options with detailed explanations
+```
 
-#### AI Model Settings
+**Step 2:** Set required environment variables (copy from `.env.example`):
+```bash
+# Azure DevOps
+ADO_COLLECTION_URL=https://dev.azure.com/MyOrg
+ADO_PROJECT=MyProject
+ADO_REPO_NAME=MyRepo
+ADO_ACCESS_TOKEN=your-pat-token
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AI_FOUNDRY_DEPLOYMENT` | `o4-mini` | Azure OpenAI deployment/model name (e.g., `gpt-4o`, `gpt-4`, `gpt-35-turbo`) |
-| `AI_TEMPERATURE` | `0.2` | Model temperature (0.0-1.0). Lower = more deterministic |
-| `AI_MAX_TOKENS` | `2000` | Maximum tokens in AI response |
+# Azure AI
+AI_FOUNDRY_ENDPOINT=https://your-endpoint.openai.azure.com
+AI_FOUNDRY_API_KEY=your-api-key
 
-#### Review Behavior
+# Local Repository
+LOCAL_REPO_PATH=/path/to/your/repo
+```
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DRY_RUN` | `false` | When `true`, performs review without posting comments or approvals to Azure DevOps |
-| `REVIEW_SCOPE` | `changed-files` | Scope of files to review |
-| `POLICY_PATH` | `./policy/review-policy.md` | Path to markdown policy file |
-| `WARN_BUDGET` | `3` | Maximum warnings allowed before rejecting approval |
+### 📖 Configuration Documentation
 
-#### Review Limits
+- **`AIReviewer/settings.ini`** - All static settings with detailed inline comments
+  - Every setting explained right where it's configured
+  - Includes default values, valid ranges, cost impacts, and guidelines
+  - Edit without recompiling - just restart the application
 
-These limits control how much content is processed and help manage API costs:
+- **[PIPELINE.md](PIPELINE.md)** - Environment variable reference
+  - Required variables for Azure DevOps and AI
+  - Azure Pipeline integration examples
+  - Security best practices
+  - Override patterns for settings.ini values
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MAX_FILES_TO_REVIEW` | `50` | Maximum number of files to review in a single PR |
-| `MAX_ISSUES_PER_FILE` | `5` | Maximum issues to report per file |
-| `MAX_FILE_BYTES` | `200000` | Maximum file size (bytes) to review. Larger files are skipped |
-| `MAX_DIFF_BYTES` | `500000` | Maximum diff size (bytes) to send to AI. Larger diffs are truncated |
-| `MAX_COMMIT_MESSAGES_TO_REVIEW` | `10` | Maximum commit messages to include in metadata review |
-| `MAX_PROMPT_DIFF_BYTES` | `8000` | Maximum diff size (bytes) in AI prompt. Larger diffs are truncated in the prompt |
+- **[.env.example](AIReviewer/.env.example)** - Local development template
+  - Copy to `.env` for local development
+  - Gitignored to protect secrets
+
+### Key Configuration Benefits
+
+✅ **Self-Documenting** - All settings explained in settings.ini  
+✅ **No Recompilation** - Edit settings.ini and restart  
+✅ **Secure** - Secrets only in environment variables  
+✅ **Flexible** - Override any setting via environment  
+✅ **Version Controlled** - Track default changes in git
 
 ## Policy Files
 

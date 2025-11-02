@@ -48,9 +48,11 @@ public sealed class ReviewerOptions
     public string AiFoundryEndpoint { get; set; } = string.Empty;
 
     /// <summary>
-    /// Azure OpenAI deployment/model name to use for reviews. Default is "o4-mini".
+    /// Azure OpenAI deployment/model name to use for reviews.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public string AiFoundryDeployment { get; set; } = "o4-mini";
+    [Required]
+    public string AiFoundryDeployment { get; set; } = string.Empty;
 
     /// <summary>
     /// API key for authenticating with Azure AI Foundry.
@@ -59,77 +61,114 @@ public sealed class ReviewerOptions
     public string AiFoundryApiKey { get; set; } = string.Empty;
 
     /// <summary>
-    /// Temperature parameter for AI model (0.0-1.0). Lower values are more deterministic. Default is 0.2.
+    /// Temperature parameter for AI model (0.0-1.0). Lower values are more deterministic.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public double AiTemperature { get; set; } = 0.2;
+    [Required]
+    public double AiTemperature { get; set; }
 
     /// <summary>
-    /// Maximum number of tokens for AI response. Default is 2000.
+    /// Maximum number of tokens for AI response.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public int AiMaxTokens { get; set; } = 2000;
+    [Required]
+    public int AiMaxTokens { get; set; }
 
     /// <summary>
     /// Enables OpenAI function calling to allow the AI to retrieve additional context during review.
     /// When enabled, the AI can call functions to get full file contents, search the codebase, etc.
-    /// This improves review quality but increases API costs and latency. Default is false.
+    /// This improves review quality but increases API costs and latency.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public bool EnableFunctionCalling { get; set; } = false;
+    [Required]
+    public bool EnableFunctionCalling { get; set; }
 
     /// <summary>
     /// Maximum number of function calls the AI can make during a single review.
-    /// This prevents infinite loops and controls API costs. Default is 5.
+    /// This prevents infinite loops and controls API costs.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public int MaxFunctionCalls { get; set; } = 5;
+    [Required]
+    public int MaxFunctionCalls { get; set; }
 
     /// <summary>
-    /// When true, performs review without posting comments or approvals to Azure DevOps. Default is false.
+    /// Threshold ratio (0.0-1.0) for detecting Japanese language in PR descriptions.
+    /// If the ratio of Japanese characters to non-whitespace characters exceeds this threshold,
+    /// reviews will be conducted in Japanese.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public bool DryRun { get; set; } = false;
+    [Required]
+    public double JapaneseDetectionThreshold { get; set; }
 
     /// <summary>
-    /// Scope of files to review. Default is "changed-files".
+    /// When true, performs review without posting comments or approvals to Azure DevOps.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public string ReviewScope { get; set; } = "changed-files";
+    [Required]
+    public bool DryRun { get; set; }
 
     /// <summary>
-    /// Maximum file size in bytes to review. Larger files are skipped. Default is 200,000 bytes.
+    /// Scope of files to review.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public int MaxFileBytes { get; set; } = 200000;
+    [Required]
+    public string ReviewScope { get; set; } = string.Empty;
 
     /// <summary>
-    /// Maximum diff size in bytes to send to AI. Larger diffs are truncated. Default is 500,000 bytes.
+    /// Maximum file size in bytes to review. Larger files are skipped.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public int MaxDiffBytes { get; set; } = 500000;
+    [Required]
+    public int MaxFileBytes { get; set; }
 
     /// <summary>
-    /// Maximum number of warnings before rejecting approval. Default is 3.
+    /// Maximum diff size in bytes to send to AI. Larger diffs are truncated.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public int WarnBudget { get; set; } = 3;
+    [Required]
+    public int MaxDiffBytes { get; set; }
 
     /// <summary>
-    /// Maximum number of files to review in a single PR. Default is 50.
+    /// Maximum number of warnings before rejecting approval.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public int MaxFilesToReview { get; set; } = 50;
+    [Required]
+    public int WarnBudget { get; set; }
 
     /// <summary>
-    /// Maximum number of issues to report per file. Default is 5.
+    /// Maximum number of files to review in a single PR.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public int MaxIssuesPerFile { get; set; } = 5;
+    [Required]
+    public int MaxFilesToReview { get; set; }
 
     /// <summary>
-    /// Maximum number of commit messages to include in metadata review. Default is 10.
+    /// Maximum number of issues to report per file.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public int MaxCommitMessagesToReview { get; set; } = 10;
+    [Required]
+    public int MaxIssuesPerFile { get; set; }
 
     /// <summary>
-    /// Maximum diff size in bytes to include in AI prompt. Larger diffs are truncated. Default is 8000 bytes.
+    /// Maximum number of commit messages to include in metadata review.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public int MaxPromptDiffBytes { get; set; } = 8000;
+    [Required]
+    public int MaxCommitMessagesToReview { get; set; }
 
     /// <summary>
-    /// Path to the review policy markdown file. Default is "./policy/review-policy.md".
+    /// Maximum diff size in bytes to include in AI prompt. Larger diffs are truncated.
+    /// Must be configured in appsettings.json or via environment variable.
     /// </summary>
-    public string PolicyPath { get; set; } = "./policy/review-policy.md";
+    [Required]
+    public int MaxPromptDiffBytes { get; set; }
+
+    /// <summary>
+    /// Path to the review policy markdown file.
+    /// Must be configured in appsettings.json or via environment variable.
+    /// </summary>
+    [Required]
+    public string PolicyPath { get; set; } = string.Empty;
 
     /// <summary>
     /// Build source version (commit SHA) for inferring the pull request when AdoPullRequestId is not specified.
@@ -146,14 +185,11 @@ public sealed class ReviewerOptions
     public string LocalRepoPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// Normalizes option values by applying default values where needed.
+    /// Normalizes option values (e.g., path separators).
+    /// All defaults must be configured in appsettings.json.
     /// </summary>
     public void Normalize()
     {
-        ReviewScope = string.IsNullOrWhiteSpace(ReviewScope) ? "changed-files" : ReviewScope;
-        AiFoundryDeployment = string.IsNullOrWhiteSpace(AiFoundryDeployment) ? "o4-mini" : AiFoundryDeployment;
-        PolicyPath = string.IsNullOrWhiteSpace(PolicyPath) ? "./policy/review-policy.md" : PolicyPath;
-        
         // Normalize LocalRepoPath to use forward slashes and remove trailing slash
         if (!string.IsNullOrWhiteSpace(LocalRepoPath))
         {

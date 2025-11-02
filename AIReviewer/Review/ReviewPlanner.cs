@@ -65,8 +65,9 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
 
         // Detect language from PR description
         var prDescription = pr.PullRequest.Description ?? string.Empty;
-        var language = LanguageDetector.DetectLanguage(prDescription);
-        logger.LogInformation("Detected review language: {Language} (based on PR description)", language);
+        var language = LanguageDetector.DetectLanguage(prDescription, _options.JapaneseDetectionThreshold);
+        logger.LogInformation("Detected review language: {Language} (based on PR description, threshold: {Threshold})", 
+            language, _options.JapaneseDetectionThreshold);
 
         if (diffs.Count > _options.MaxFilesToReview)
         {

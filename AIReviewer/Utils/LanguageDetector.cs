@@ -10,12 +10,13 @@ public static partial class LanguageDetector
 {
     /// <summary>
     /// Detects the primary language of the given text.
-    /// Returns "ja" for Japanese if more than 30% of non-whitespace characters are Japanese,
+    /// Returns "ja" for Japanese if the ratio of Japanese characters exceeds the threshold,
     /// otherwise returns "en" for English.
     /// </summary>
     /// <param name="text">The text to analyze.</param>
+    /// <param name="japaneseThreshold">Threshold ratio (0.0-1.0) for Japanese detection. Default is 0.3.</param>
     /// <returns>Language code: "ja" for Japanese, "en" for English.</returns>
-    public static string DetectLanguage(string text)
+    public static string DetectLanguage(string text, double japaneseThreshold = 0.3)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -31,7 +32,7 @@ public static partial class LanguageDetector
         }
 
         var japaneseRatio = (double)japaneseChars / nonWhitespace;
-        return japaneseRatio > 0.3 ? "ja" : "en";
+        return japaneseRatio > japaneseThreshold ? "ja" : "en";
     }
 
     /// <summary>
