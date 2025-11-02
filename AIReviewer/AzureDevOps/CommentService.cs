@@ -19,12 +19,6 @@ namespace AIReviewer.AzureDevOps;
 public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient adoClient, RetryPolicyFactory retryPolicy)
 {
 
-    /// <summary>Property key to identify bot-created threads.</summary>
-    private const string BotProperty = "ai-bot";
-    /// <summary>Property key to store issue fingerprints for tracking across iterations.</summary>
-    private const string FingerprintProperty = "fingerprint";
-    /// <summary>Identifier for the special state tracking thread.</summary>
-    private const string StateThreadIdentifier = "ai-state";
 
     /// <summary>
     /// Applies the review results by creating, updating, or resolving comment threads on the pull request.
@@ -37,11 +31,11 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
     public async Task ApplyReviewAsync(PullRequestContext pr, GitPullRequestIteration iteration, ReviewPlanResult result, CancellationToken cancellationToken)
     {
         var threads = await adoClient.Git.GetThreadsAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken);
-        var botThreads = threads.Where(t => t.Properties?.ContainsKey(BotProperty) == true).ToList();
+        var botThreads = threads.Where(t => t.IsBot()).ToList();
 
         foreach (var issue in result.Issues)
         {
-            var existing = botThreads.FirstOrDefault(t => t.Properties?.TryGetValue(FingerprintProperty, out var fp) == true && fp.ToString() == issue.Fingerprint);
+            var existing = botThreads.FirstOrDefault(t => t.GetFingerprint() == issue.Fingerprint);
             if (existing != null)
             {
                 await AppendToExistingThreadAsync(pr, existing, issue, cancellationToken);
@@ -78,16 +72,14 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
                 new Comment
                 {
                     CommentType = CommentType.Text,
-                    Content = FormatComment(issue)
+                    Content = CommentFormatter.FormatReviewIssue(issue)
                 }
             ],
-            Status = CommentThreadStatus.Active,
-            Properties = new Microsoft.VisualStudio.Services.WebApi.PropertiesCollection
-            {
-                [BotProperty] = true,
-                [FingerprintProperty] = issue.Fingerprint
-            }
+            Status = CommentThreadStatus.Active
         };
+
+        thread.MarkAsBot();
+        thread.SetFingerprint(issue.Fingerprint);
 
         var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
         await retry.ExecuteAsync(() => adoClient.Git.CreateThreadAsync(thread, pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
@@ -112,13 +104,12 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
             thread.Status = CommentThreadStatus.Active;
         }
 
-        thread.Properties ??= [];
-        thread.Properties[FingerprintProperty] = issue.Fingerprint;
+        thread.SetFingerprint(issue.Fingerprint);
 
         thread.Comments.Add(new Comment
         {
             CommentType = CommentType.Text,
-            Content = $"Re-triggered: {FormatComment(issue)}"
+            Content = CommentFormatter.FormatReTriggeredIssue(issue)
         });
 
         await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(thread, pr.Repository.Id, thread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
@@ -142,15 +133,13 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
 
         foreach (var thread in botThreads)
         {
-            if (thread.Properties?.TryGetValue(FingerprintProperty, out var property) == true && property is string fp)
+            var fingerprint = thread.GetFingerprint();
+            if (fingerprint != null && !remainingFingerprints.Contains(fingerprint))
             {
-                if (!remainingFingerprints.Contains(fp))
-                {
-                    thread.Status = CommentThreadStatus.Fixed;
-                    var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
-                    await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(thread, pr.Repository.Id, thread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
-                    closed.Add(thread.Id);
-                }
+                thread.Status = CommentThreadStatus.Fixed;
+                var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
+                await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(thread, pr.Repository.Id, thread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
+                closed.Add(thread.Id);
             }
         }
 
@@ -171,21 +160,9 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
     /// <returns>A task representing the asynchronous operation.</returns>
     private async Task UpsertStateThreadAsync(PullRequestContext pr, ReviewPlanResult result, List<GitPullRequestCommentThread> botThreads, CancellationToken cancellationToken)
     {
-        var state = new
-        {
-            fingerprints = result.Issues.Select(i => new
-            {
-                i.Fingerprint,
-                i.FilePath,
-                i.Line,
-                i.Severity
-            }).ToArray(),
-            updatedAt = DateTimeOffset.UtcNow
-        };
+        var content = CommentFormatter.FormatStateThread(result);
 
-        var content = $"<!-- {StateThreadIdentifier} -->\n```\n{JsonHelpers.Serialize(state)}\n```";
-
-        var stateThread = botThreads.FirstOrDefault(t => t.Properties?.ContainsKey(StateThreadIdentifier) == true);
+        var stateThread = botThreads.FirstOrDefault(t => t.IsStateThread());
         var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
 
         if (stateThread == null)
@@ -200,13 +177,10 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
                         Content = content
                     }
                 ],
-                Status = CommentThreadStatus.Closed,
-                Properties = new Microsoft.VisualStudio.Services.WebApi.PropertiesCollection
-                {
-                    [BotProperty] = true,
-                    [StateThreadIdentifier] = true
-                }
+                Status = CommentThreadStatus.Closed
             };
+
+            thread.MarkAsStateThread();
 
             await retry.ExecuteAsync(() => adoClient.Git.CreateThreadAsync(thread, pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
             logger.LogInformation("Created state thread for fingerprints");
@@ -217,31 +191,5 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
             await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(stateThread, pr.Repository.Id, stateThread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
             logger.LogInformation("Updated state thread for fingerprints");
         }
-    }
-
-    /// <summary>
-    /// Formats a review issue into a markdown comment for display on Azure DevOps.
-    /// </summary>
-    /// <param name="issue">The issue to format.</param>
-    /// <returns>A markdown-formatted comment string.</returns>
-    private static string FormatComment(ReviewIssue issue)
-    {
-        var builder = new System.Text.StringBuilder();
-        builder.AppendLine($"🤖 AI Review — {issue.Category}/{issue.Severity}");
-        builder.AppendLine();
-        builder.AppendLine(issue.Rationale);
-        builder.AppendLine();
-        builder.AppendLine($"**Recommendation**: {issue.Recommendation}");
-        if (!string.IsNullOrWhiteSpace(issue.FixExample))
-        {
-            builder.AppendLine();
-            builder.AppendLine("```csharp");
-            builder.AppendLine(issue.FixExample);
-            builder.AppendLine("```");
-        }
-
-        builder.AppendLine();
-        builder.AppendLine("_I’m a bot; reply here to discuss. Set `DRY_RUN=true` to preview without posting._");
-        return builder.ToString();
     }
 }

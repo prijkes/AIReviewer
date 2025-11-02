@@ -249,6 +249,26 @@ public sealed class AdoSdkClient : IDisposable
     }
 
     /// <summary>
+    /// Gets the unified diff for a file between two commits using local git repository.
+    /// </summary>
+    /// <param name="filePath">The path to the file.</param>
+    /// <param name="baseCommit">The base commit SHA.</param>
+    /// <param name="targetCommit">The target commit SHA.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>The unified diff text.</returns>
+    public async Task<string?> GetFileDiffAsync(
+        string filePath,
+        string baseCommit,
+        string targetCommit,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogDebug("Getting file diff from local repository for: {FilePath} ({Base}..{Target})", 
+            filePath, baseCommit[..Math.Min(8, baseCommit.Length)], targetCommit[..Math.Min(8, targetCommit.Length)]);
+        
+        return await _localGitProvider.GetFileDiffAsync(filePath, baseCommit, targetCommit);
+    }
+
+    /// <summary>
     /// Disposes the ADO client and disconnects the VSS connection.
     /// </summary>
     public void Dispose()

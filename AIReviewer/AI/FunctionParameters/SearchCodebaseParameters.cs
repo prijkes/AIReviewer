@@ -25,5 +25,6 @@ public class SearchCodebaseParameters
     /// Maximum number of results to return (default: 10, max: 100)
     /// </summary>
     [JsonPropertyName("maxResults")]
+    [Range(1, FunctionDefaults.SearchMaxResultsLimit)]
     public int? MaxResults { get; set; }
 }

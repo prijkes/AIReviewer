@@ -19,5 +19,6 @@ public class GetFileHistoryParameters
     /// Maximum number of commits to return (default: 5, max: 30)
     /// </summary>
     [JsonPropertyName("maxCommits")]
+    [Range(1, FunctionDefaults.FileHistoryMaxCommitsLimit)]
     public int? MaxCommits { get; set; }
 }

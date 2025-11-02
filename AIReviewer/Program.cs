@@ -26,9 +26,9 @@ internal static class Program
             {
                 cfg.AddEnvironmentVariables();
                 var envFile = Path.Combine(AppContext.BaseDirectory, ".env");
-                if (File.Exists(envFile))
+                var envData = DotEnvParser.Parse(envFile);
+                if (envData.Count > 0)
                 {
-                    var envData = ParseDotEnv(envFile);
                     cfg.AddInMemoryCollection(envData);
                 }
                 cfg.AddEnvironmentVariables();
@@ -64,6 +64,7 @@ internal static class Program
                 services.AddSingleton<StateStore>();
                 services.AddSingleton<ReviewPlanner>();
                 services.AddSingleton<ReviewContextRetriever>();
+                services.AddSingleton<PromptBuilder>();
                 services.AddSingleton<IAiClient, AzureFoundryAiClient>();
 
                 services.AddHostedService<ReviewerHostedService>();
@@ -71,41 +72,5 @@ internal static class Program
             .Build();
 
         await host.RunAsync();
-    }
-
-    /// <summary>
-    /// Parses a POSIX-style .env file and hydrates environment variables into configuration.
-    /// </summary>
-    private static Dictionary<string, string?> ParseDotEnv(string envFile)
-    {
-        var data = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var rawLine in File.ReadAllLines(envFile))
-        {
-            if (string.IsNullOrWhiteSpace(rawLine)) continue;
-
-            var line = rawLine.Trim();
-            if (line.StartsWith('#')) continue;
-
-            if (line.StartsWith("export ", StringComparison.OrdinalIgnoreCase)) line = line["export ".Length..].TrimStart();
-
-            var separatorIndex = line.IndexOf('=');
-            if (separatorIndex <= 0) continue;
-
-            var key = line[..separatorIndex].Trim();
-            var value = line[(separatorIndex + 1)..].Trim();
-
-            if (value.Length >= 2 &&
-                ((value.StartsWith('"') && value.EndsWith('"')) ||
-                 (value.StartsWith('\'') && value.EndsWith('\''))))
-            {
-                value = value[1..^1];
-            }
-
-            data[key] = value;
-            Environment.SetEnvironmentVariable(key, value);
-        }
-
-        return data;
     }
 }

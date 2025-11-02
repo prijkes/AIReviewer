@@ -44,6 +44,16 @@ public sealed class DiffService(ILogger<DiffService> logger, AdoSdkClient adoCli
         var changes = await adoClient.GetIterationChangesAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, iterationId, cancellationToken);
         var diffs = new List<ReviewFileDiff>();
 
+        // Get the base and target commits for diff generation
+        var baseCommit = pr.PullRequest.LastMergeTargetCommit?.CommitId;
+        var targetCommit = pr.PullRequest.LastMergeSourceCommit?.CommitId;
+
+        if (string.IsNullOrEmpty(baseCommit) || string.IsNullOrEmpty(targetCommit))
+        {
+            logger.LogWarning("Cannot generate diffs: base or target commit is missing");
+            return diffs;
+        }
+
         foreach (var change in changes.ChangeEntries ?? [])
         {
             if (change.Item is not GitItem gitItem) continue;
@@ -51,15 +61,22 @@ public sealed class DiffService(ILogger<DiffService> logger, AdoSdkClient adoCli
             var path = gitItem.Path ?? string.Empty;
             if (string.IsNullOrWhiteSpace(path)) continue;
 
-            var isBinary = change.ChangeTrackingId == 0 && gitItem.GitObjectType == GitObjectType.Blob;
+            // Check if binary based on file type
+            var isBinary = gitItem.GitObjectType != GitObjectType.Blob;
             if (isBinary)
             {
-                logger.LogInformation("Skipping binary file {Path}", path);
+                logger.LogInformation("Skipping non-blob file {Path}", path);
                 continue;
             }
 
-            // Get the diff text for this change
-            var textDiff = change.ChangeTrackingId.ToString();
+            // Generate the actual diff using git
+            var textDiff = await adoClient.GetFileDiffAsync(path, baseCommit, targetCommit, cancellationToken);
+            
+            if (string.IsNullOrEmpty(textDiff))
+            {
+                logger.LogDebug("No diff content for {Path}, skipping", path);
+                continue;
+            }
 
             // Truncate if needed and log
             var trimmedDiff = textDiff;

@@ -102,6 +102,17 @@ public sealed class LocalGitProvider : IDisposable
         return Task.Run(() => GetFileHistory(filePath, versionDescriptor, maxCommits));
     }
 
+    /// <summary>
+    /// Gets the unified diff for a file between two commits.
+    /// </summary>
+    public Task<string?> GetFileDiffAsync(
+        string filePath,
+        string baseCommit,
+        string targetCommit)
+    {
+        return Task.Run(() => GetFileDiff(filePath, baseCommit, targetCommit));
+    }
+
     private List<CodeSearchResult> SearchCode(
         string searchTerm,
         string versionDescriptor,
@@ -282,6 +293,41 @@ public sealed class LocalGitProvider : IDisposable
         {
             _logger.LogError(ex, "Error getting history for: {FilePath}", filePath);
             return [];
+        }
+    }
+
+    private string? GetFileDiff(string filePath, string baseCommit, string targetCommit)
+    {
+        try
+        {
+            filePath = NormalizePath(filePath);
+
+            var baseCommitObj = ResolveCommit(baseCommit);
+            var targetCommitObj = ResolveCommit(targetCommit);
+
+            if (baseCommitObj == null || targetCommitObj == null)
+            {
+                _logger.LogWarning("Failed to resolve commits for diff: {Base} -> {Target}", baseCommit, targetCommit);
+                return null;
+            }
+
+            // Get the patch for the file
+            var patch = _repository.Diff.Compare<Patch>(baseCommitObj.Tree, targetCommitObj.Tree, new[] { filePath });
+            
+            if (patch == null || !patch.Any())
+            {
+                _logger.LogDebug("No diff found for {FilePath} between {Base} and {Target}", filePath, baseCommit, targetCommit);
+                return string.Empty; // File unchanged
+            }
+
+            var diff = patch.Content;
+            _logger.LogDebug("Generated {Size} bytes diff for {FilePath}", diff.Length, filePath);
+            return diff;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting diff for: {FilePath} ({Base} -> {Target})", filePath, baseCommit, targetCommit);
+            return null;
         }
     }
 

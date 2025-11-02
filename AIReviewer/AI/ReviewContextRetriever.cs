@@ -105,12 +105,12 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
     /// <param name="filePattern">Optional file pattern filter (e.g., "*.cs", "*.csproj")</param>
     /// <param name="maxResults">Maximum number of results to return (default: 10, max: 100)</param>
     /// <returns>List of files and locations where the term was found</returns>
-    public async Task<string> SearchCodebaseAsync(string searchTerm, string? filePattern = null, int maxResults = 10)
+    public async Task<string> SearchCodebaseAsync(string searchTerm, string? filePattern = null, int maxResults = FunctionDefaults.SearchDefaultMaxResults)
     {
         EnsureContextSet();
         
         // Clamp to reasonable limits
-        maxResults = Math.Clamp(maxResults, 1, 100);
+        maxResults = Math.Clamp(maxResults, 1, FunctionDefaults.SearchMaxResultsLimit);
         
         try
         {
@@ -224,12 +224,12 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
     /// <param name="filePath">The path to the file</param>
     /// <param name="maxCommits">Maximum number of commits to return (default: 5, max: 30)</param>
     /// <returns>List of commits that modified this file</returns>
-    public async Task<string> GetFileHistoryAsync(string filePath, int maxCommits = 5)
+    public async Task<string> GetFileHistoryAsync(string filePath, int maxCommits = FunctionDefaults.FileHistoryDefaultMaxCommits)
     {
         EnsureContextSet();
         
         // Clamp to reasonable limits
-        maxCommits = Math.Clamp(maxCommits, 1, 30);
+        maxCommits = Math.Clamp(maxCommits, 1, FunctionDefaults.FileHistoryMaxCommitsLimit);
         
         try
         {

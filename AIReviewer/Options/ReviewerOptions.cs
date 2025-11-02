@@ -76,6 +76,12 @@ public sealed class ReviewerOptions
     public bool EnableFunctionCalling { get; set; } = false;
 
     /// <summary>
+    /// Maximum number of function calls the AI can make during a single review.
+    /// This prevents infinite loops and controls API costs. Default is 5.
+    /// </summary>
+    public int MaxFunctionCalls { get; set; } = 5;
+
+    /// <summary>
     /// When true, performs review without posting comments or approvals to Azure DevOps. Default is false.
     /// </summary>
     public bool DryRun { get; set; } = false;
