@@ -6,23 +6,16 @@ namespace AIReviewer.Diff;
 
 /// <summary>
 /// Intelligently splits large diffs into smaller, logical chunks for review.
+/// Uses language-agnostic strategies based on diff structure rather than code syntax.
 /// </summary>
-public sealed class DiffChunker
+public sealed partial class DiffChunker(ILogger<DiffChunker> logger)
 {
-    private readonly ILogger<DiffChunker> _logger;
-
-    // Patterns to identify code boundaries
-    private static readonly Regex ClassPattern = new(@"^\+?\s*(public|private|internal|protected)?\s*(static\s+)?(class|interface|struct|enum)\s+\w+", RegexOptions.Compiled | RegexOptions.Multiline);
-    private static readonly Regex MethodPattern = new(@"^\+?\s*(public|private|internal|protected)?\s*(static\s+)?(async\s+)?[\w<>]+\s+\w+\s*\([^)]*\)", RegexOptions.Compiled | RegexOptions.Multiline);
-    private static readonly Regex PropertyPattern = new(@"^\+?\s*(public|private|internal|protected)?\s*(static\s+)?[\w<>]+\s+\w+\s*\{\s*(get|set)", RegexOptions.Compiled | RegexOptions.Multiline);
-
-    public DiffChunker(ILogger<DiffChunker> logger)
-    {
-        _logger = logger;
-    }
+    // Pattern to identify diff hunk headers (e.g., @@ -10,5 +10,7 @@)
+    private static readonly Regex DiffHunkHeaderPattern = DiffHunkHeaderRegex();
 
     /// <summary>
-    /// Splits a large diff into logical chunks based on code structure.
+    /// Splits a large diff into logical chunks based on diff structure.
+    /// This implementation is language-agnostic and works with any programming language.
     /// </summary>
     /// <param name="diff">The diff to chunk.</param>
     /// <param name="maxChunkSize">Maximum size of each chunk in bytes.</param>
@@ -32,8 +25,8 @@ public sealed class DiffChunker
         if (diff.DiffText.Length <= maxChunkSize)
         {
             // No need to chunk
-            return new List<DiffChunk>
-            {
+            return
+            [
                 new DiffChunk
                 {
                     FilePath = diff.Path,
@@ -41,9 +34,10 @@ public sealed class DiffChunker
                     ChunkIndex = 0,
                     TotalChunks = 1,
                     StartLine = 1,
-                    Context = "Full file diff"
+                    Context = "Full file diff",
+                    DisplayName = diff.Path
                 }
-            };
+            ];
         }
 
         var lines = diff.DiffText.Split('\n');
@@ -51,8 +45,8 @@ public sealed class DiffChunker
         var currentChunk = new StringBuilder();
         var currentChunkStartLine = 1;
         var chunkIndex = 0;
-        var lastBoundaryLine = 0;
-        var lastBoundaryContext = "Start of file";
+        var lastHunkLine = 0;
+        var lastHunkHeader = "Start of diff";
 
         for (int i = 0; i < lines.Length; i++)
         {
@@ -63,12 +57,13 @@ public sealed class DiffChunker
             if (currentChunk.Length + lineWithNewline.Length > maxChunkSize && currentChunk.Length > 0)
             {
                 // Try to find a good boundary to split at
-                var splitPoint = FindBestSplitPoint(lines, lastBoundaryLine, i);
+                var splitPoint = FindBestSplitPoint(lines, lastHunkLine, i);
                 
-                if (splitPoint > lastBoundaryLine && splitPoint < i)
+                if (splitPoint > lastHunkLine && splitPoint < i)
                 {
                     // Create chunk up to split point
-                    chunks.Add(CreateChunk(diff.Path, currentChunk.ToString(), chunkIndex, currentChunkStartLine, lastBoundaryContext));
+                    var chunkContent = BuildChunkContent(lines, currentChunkStartLine - 1, splitPoint);
+                    chunks.Add(CreateChunk(diff.Path, chunkContent, chunkIndex, currentChunkStartLine, lastHunkHeader));
                     
                     // Start new chunk from split point
                     currentChunk.Clear();
@@ -81,23 +76,33 @@ public sealed class DiffChunker
                         currentChunk.AppendLine(lines[j]);
                     }
                     
-                    lastBoundaryLine = i;
-                    lastBoundaryContext = ExtractContext(line);
+                    lastHunkLine = i;
+                    lastHunkHeader = ExtractHunkContext(line, i);
                     continue;
                 }
                 
-                // No good split point found, split here
-                chunks.Add(CreateChunk(diff.Path, currentChunk.ToString(), chunkIndex, currentChunkStartLine, lastBoundaryContext));
+                // No good split point found, split here but try to avoid splitting change blocks
+                var adjustedSplit = AdjustSplitToAvoidChangeBlock(lines, i);
+                var adjustedContent = BuildChunkContent(lines, currentChunkStartLine - 1, adjustedSplit);
+                chunks.Add(CreateChunk(diff.Path, adjustedContent, chunkIndex, currentChunkStartLine, lastHunkHeader));
+                
                 currentChunk.Clear();
-                currentChunkStartLine = i + 1;
+                currentChunkStartLine = adjustedSplit + 2; // +2 because we include one more line
                 chunkIndex++;
+                
+                // Add remaining lines to new chunk
+                for (int j = adjustedSplit + 1; j <= i; j++)
+                {
+                    currentChunk.AppendLine(lines[j]);
+                }
+                continue;
             }
 
-            // Check if this line is a code boundary
-            if (IsCodeBoundary(line))
+            // Check if this line is a diff hunk header
+            if (IsDiffHunkHeader(line))
             {
-                lastBoundaryLine = i;
-                lastBoundaryContext = ExtractContext(line);
+                lastHunkLine = i;
+                lastHunkHeader = ExtractHunkContext(line, i);
             }
 
             currentChunk.Append(lineWithNewline);
@@ -106,7 +111,7 @@ public sealed class DiffChunker
         // Add remaining chunk
         if (currentChunk.Length > 0)
         {
-            chunks.Add(CreateChunk(diff.Path, currentChunk.ToString(), chunkIndex, currentChunkStartLine, lastBoundaryContext));
+            chunks.Add(CreateChunk(diff.Path, currentChunk.ToString(), chunkIndex, currentChunkStartLine, lastHunkHeader));
         }
 
         // Update total chunks count
@@ -114,74 +119,128 @@ public sealed class DiffChunker
         foreach (var chunk in chunks)
         {
             chunk.TotalChunks = totalChunks;
+            chunk.DisplayName = totalChunks > 1 
+                ? $"{chunk.FilePath} (chunk {chunk.ChunkIndex + 1}/{totalChunks}: {chunk.Context})" 
+                : chunk.FilePath;
         }
 
-        _logger.LogInformation("Split {FilePath} into {ChunkCount} chunks (original size: {OriginalSize} bytes)", 
+        logger.LogInformation("Split {FilePath} into {ChunkCount} chunks (original size: {OriginalSize} bytes)", 
             diff.Path, totalChunks, diff.DiffText.Length);
 
         return chunks;
     }
 
     /// <summary>
-    /// Finds the best point to split the diff, preferring code boundaries.
+    /// Finds the best point to split the diff, preferring diff hunk boundaries and empty lines.
+    /// This is language-agnostic.
     /// </summary>
-    private int FindBestSplitPoint(string[] lines, int start, int end)
+    private static int FindBestSplitPoint(string[] lines, int start, int end)
     {
-        // Look backwards from end to find a code boundary
+        // Strategy 1: Look backwards from end to find a diff hunk header
         for (int i = end - 1; i > start; i--)
         {
-            if (IsCodeBoundary(lines[i]))
+            if (IsDiffHunkHeader(lines[i]))
+            {
+                return i - 1; // Split just before the hunk header
+            }
+        }
+
+        // Strategy 2: Look for empty lines (common logical boundaries in any language)
+        for (int i = end - 1; i > start; i--)
+        {
+            if (string.IsNullOrWhiteSpace(lines[i]) || 
+                (lines[i].Length > 0 && string.IsNullOrWhiteSpace(lines[i].TrimStart('+', '-', ' '))))
             {
                 return i;
             }
         }
 
-        // No boundary found, split at current position
+        // Strategy 3: Look for lines that aren't part of a change (context lines starting with space)
+        for (int i = end - 1; i > start; i--)
+        {
+            if (lines[i].Length > 0 && lines[i][0] == ' ')
+            {
+                return i;
+            }
+        }
+
+        // No good boundary found, split at current position
         return end;
     }
 
     /// <summary>
-    /// Determines if a line represents a code boundary (class, method, property, etc.).
+    /// Adjusts the split point to avoid breaking in the middle of a change block.
+    /// A change block is a sequence of consecutive + or - lines.
     /// </summary>
-    private bool IsCodeBoundary(string line)
+    private static int AdjustSplitToAvoidChangeBlock(string[] lines, int proposedSplit)
     {
-        return ClassPattern.IsMatch(line) || 
-               MethodPattern.IsMatch(line) || 
-               PropertyPattern.IsMatch(line);
+        // If the proposed split is in the middle of a change block, move backwards
+        if (proposedSplit > 0 && proposedSplit < lines.Length)
+        {
+            var currentLine = lines[proposedSplit];
+            if (currentLine.Length > 0 && (currentLine[0] == '+' || currentLine[0] == '-'))
+            {
+                // Move backwards to find the start of this change block
+                for (int i = proposedSplit - 1; i >= 0; i--)
+                {
+                    if (lines[i].Length == 0 || (lines[i][0] != '+' && lines[i][0] != '-'))
+                    {
+                        return i;
+                    }
+                }
+            }
+        }
+        
+        return proposedSplit;
     }
 
     /// <summary>
-    /// Extracts contextual information from a code boundary line.
+    /// Builds chunk content from an array of lines.
     /// </summary>
-    private string ExtractContext(string line)
+    private static string BuildChunkContent(string[] lines, int start, int end)
     {
-        line = line.TrimStart('+', '-', ' ', '\t');
-        
-        if (ClassPattern.IsMatch(line))
+        var sb = new StringBuilder();
+        for (int i = start; i <= end && i < lines.Length; i++)
         {
-            var match = Regex.Match(line, @"(class|interface|struct|enum)\s+(\w+)");
-            if (match.Success)
-                return $"{match.Groups[1].Value} {match.Groups[2].Value}";
+            sb.AppendLine(lines[i]);
         }
-        
-        if (MethodPattern.IsMatch(line))
-        {
-            var match = Regex.Match(line, @"([\w<>]+)\s+(\w+)\s*\(");
-            if (match.Success)
-                return $"Method {match.Groups[2].Value}";
-        }
-        
-        if (PropertyPattern.IsMatch(line))
-        {
-            var match = Regex.Match(line, @"([\w<>]+)\s+(\w+)\s*\{");
-            if (match.Success)
-                return $"Property {match.Groups[2].Value}";
-        }
-
-        return "Code section";
+        return sb.ToString();
     }
 
-    private DiffChunk CreateChunk(string filePath, string content, int chunkIndex, int startLine, string context)
+    /// <summary>
+    /// Determines if a line is a diff hunk header.
+    /// Hunk headers start with @@ and are a universal part of unified diff format.
+    /// </summary>
+    private static bool IsDiffHunkHeader(string line) => 
+        line.TrimStart().StartsWith("@@") && DiffHunkHeaderPattern.IsMatch(line);
+
+    /// <summary>
+    /// Extracts contextual information from a diff hunk header or position.
+    /// </summary>
+    private static string ExtractHunkContext(string line, int lineNumber)
+    {
+        if (IsDiffHunkHeader(line))
+        {
+            // Extract line number information from hunk header
+            // Format: @@ -oldstart,oldcount +newstart,newcount @@ optional context
+            var match = DiffHunkHeaderPattern.Match(line);
+            if (match.Success)
+            {
+                var newStart = match.Groups[1].Value;
+                var context = line.Contains("@@", StringComparison.Ordinal) && line.LastIndexOf("@@") < line.Length - 2
+                    ? line[(line.LastIndexOf("@@") + 2)..].Trim()
+                    : "";
+                
+                return string.IsNullOrEmpty(context) 
+                    ? $"Lines starting at {newStart}" 
+                    : $"{context} (line {newStart})";
+            }
+        }
+
+        return $"Line {lineNumber + 1}";
+    }
+
+    private static DiffChunk CreateChunk(string filePath, string content, int chunkIndex, int startLine, string context)
     {
         return new DiffChunk
         {
@@ -190,9 +249,13 @@ public sealed class DiffChunker
             ChunkIndex = chunkIndex,
             TotalChunks = 0, // Will be updated later
             StartLine = startLine,
-            Context = context
+            Context = context,
+            DisplayName = filePath // Will be updated later
         };
     }
+
+    [GeneratedRegex(@"@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@", RegexOptions.Compiled)]
+    private static partial Regex DiffHunkHeaderRegex();
 }
 
 /// <summary>
@@ -231,9 +294,7 @@ public sealed class DiffChunk
     public required string Context { get; init; }
 
     /// <summary>
-    /// Gets a display name for this chunk.
+    /// Display name for this chunk (includes chunk number if file is split).
     /// </summary>
-    public string DisplayName => TotalChunks > 1 
-        ? $"{FilePath} (chunk {ChunkIndex + 1}/{TotalChunks}: {Context})" 
-        : FilePath;
+    public string DisplayName { get; set; } = string.Empty;
 }

@@ -59,11 +59,11 @@ public class ReviewPlannerTests
 
         _aiClientMock
             .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiReviewResponse(new List<AiIssue>()));
+            .ReturnsAsync(new AiReviewResponse([]));
 
         _aiClientMock
             .Setup(x => x.ReviewPullRequestMetadataAsync(It.IsAny<string>(), It.IsAny<PullRequestMetadata>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiReviewResponse(new List<AiIssue>()));
+            .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
         var result = await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);
@@ -98,7 +98,7 @@ public class ReviewPlannerTests
 
         _aiClientMock
             .Setup(x => x.ReviewPullRequestMetadataAsync(It.IsAny<string>(), It.IsAny<PullRequestMetadata>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiReviewResponse(new List<AiIssue>()));
+            .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
         var result = await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);
@@ -134,7 +134,7 @@ public class ReviewPlannerTests
 
         _aiClientMock
             .Setup(x => x.ReviewPullRequestMetadataAsync(It.IsAny<string>(), It.IsAny<PullRequestMetadata>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiReviewResponse(new List<AiIssue>()));
+            .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
         var result = await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);
@@ -172,7 +172,7 @@ public class ReviewPlannerTests
 
         _aiClientMock
             .Setup(x => x.ReviewPullRequestMetadataAsync(It.IsAny<string>(), It.IsAny<PullRequestMetadata>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiReviewResponse(new List<AiIssue>()));
+            .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
         var result = await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);
@@ -197,11 +197,11 @@ public class ReviewPlannerTests
 
         _aiClientMock
             .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiReviewResponse(new List<AiIssue>()));
+            .ReturnsAsync(new AiReviewResponse([]));
 
         _aiClientMock
             .Setup(x => x.ReviewPullRequestMetadataAsync(It.IsAny<string>(), It.IsAny<PullRequestMetadata>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AiReviewResponse(new List<AiIssue>()));
+            .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
         await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);

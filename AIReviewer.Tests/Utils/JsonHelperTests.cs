@@ -48,7 +48,7 @@ public class JsonHelperTests
         { 
             Name = "John", 
             Age = 30, 
-            Tags = new List<string> { "developer", "tester" }
+            Tags = ["developer", "tester"]
         };
 
         // Act
@@ -205,7 +205,7 @@ public class JsonHelperTests
         {
             Name = "Test User",
             Age = 42,
-            Tags = new List<string> { "tag1", "tag2", "tag3" }
+            Tags = ["tag1", "tag2", "tag3"]
         };
 
         // Act

@@ -112,7 +112,7 @@ public class PromptBuilderTests
         var metadata = new PullRequestMetadata(
             "Fix bug",
             "Fixed authentication bug",
-            new List<string> { "Commit 1", "Commit 2", "Commit 3" }
+            ["Commit 1", "Commit 2", "Commit 3"]
         );
 
         // Act

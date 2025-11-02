@@ -16,7 +16,7 @@ public sealed class ReviewMetrics
     private int _totalWarnings;
     private long _totalInputTokens;
     private long _totalOutputTokens;
-    private readonly List<FileReviewMetric> _fileMetrics = new();
+    private readonly List<FileReviewMetric> _fileMetrics = [];
 
     public ReviewMetrics(ILogger<ReviewMetrics> logger)
     {

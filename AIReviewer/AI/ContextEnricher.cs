@@ -177,6 +177,6 @@ public sealed class DiffAnalysis
     public int DeletedLines { get; set; }
     public int NetChange { get; set; }
     public int TotalChanges { get; set; }
-    public HashSet<string> AffectedTypes { get; } = new();
-    public HashSet<string> AffectedMethods { get; } = new();
+    public HashSet<string> AffectedTypes { get; } = [];
+    public HashSet<string> AffectedMethods { get; } = [];
 }

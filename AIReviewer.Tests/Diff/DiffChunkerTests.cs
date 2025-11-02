@@ -50,58 +50,6 @@ public class DiffChunkerTests
         result.Select(c => c.ChunkIndex).Should().BeInAscendingOrder();
     }
 
-    [Fact]
-    public void ChunkDiff_WithClassBoundary_ShouldSplitAtClass()
-    {
-        // Arrange
-        var diff = @"using System;
-
-+public class FirstClass
-+{
-+    public void Method1() { }
-+" + new string('x', 200) + @"
-+}
-
-+public class SecondClass
-+{
-+    public void Method2() { }
-+}";
-        var diffObj = new ReviewFileDiff("test.cs", diff, "hash1", false);
-        var maxChunkSize = 150;
-
-        // Act
-        var result = _chunker.ChunkDiff(diffObj, maxChunkSize);
-
-        // Assert
-        result.Should().HaveCountGreaterThan(1);
-        result.Any(c => c.Context.Contains("class")).Should().BeTrue();
-    }
-
-    [Fact]
-    public void ChunkDiff_WithMethodBoundary_ShouldSplitAtMethod()
-    {
-        // Arrange
-        var diff = @"+public class TestClass
-+{
-+    public void FirstMethod()
-+    {
-" + new string('x', 200) + @"
-+    }
-+
-+    public void SecondMethod()
-+    {
-+        // Method body
-+    }
-+}";
-        var diffObj = new ReviewFileDiff("test.cs", diff, "hash1", false);
-        var maxChunkSize = 150;
-
-        // Act
-        var result = _chunker.ChunkDiff(diffObj, maxChunkSize);
-
-        // Assert
-        result.Should().HaveCountGreaterThan(1);
-    }
 
     [Fact]
     public void ChunkDiff_ShouldSetCorrectChunkIndices()
@@ -137,83 +85,60 @@ public class DiffChunkerTests
         result.Should().OnlyContain(c => c.TotalChunks == totalChunks);
     }
 
-    [Fact]
-    public void ChunkDiff_WithPropertyBoundary_ShouldRecognizeProperty()
-    {
-        // Arrange
-        var diff = @"+public class TestClass
-+{
-+    public string FirstProperty { get; set; }
-" + new string('x', 200) + @"
-+
-+    public int SecondProperty { get; set; }
-+}";
-        var diffObj = new ReviewFileDiff("test.cs", diff, "hash1", false);
-        var maxChunkSize = 150;
-
-        // Act
-        var result = _chunker.ChunkDiff(diffObj, maxChunkSize);
-
-        // Assert
-        result.Should().HaveCountGreaterThan(0);
-    }
 
     [Fact]
     public void DiffChunk_DisplayName_WithSingleChunk_ShouldReturnFilePath()
     {
         // Arrange
-        var chunk = new DiffChunk
-        {
-            FilePath = "test.cs",
-            Content = "content",
-            ChunkIndex = 0,
-            TotalChunks = 1,
-            StartLine = 1,
-            Context = "Full file diff"
-        };
+        var diff = new ReviewFileDiff("test.cs", "small content", "hash1", false);
 
         // Act
-        var displayName = chunk.DisplayName;
+        var result = _chunker.ChunkDiff(diff, 1000);
 
         // Assert
-        displayName.Should().Be("test.cs");
+        result.Should().HaveCount(1);
+        result[0].DisplayName.Should().Be("test.cs");
     }
 
     [Fact]
     public void DiffChunk_DisplayName_WithMultipleChunks_ShouldIncludeChunkInfo()
     {
         // Arrange
-        var chunk = new DiffChunk
-        {
-            FilePath = "test.cs",
-            Content = "content",
-            ChunkIndex = 1,
-            TotalChunks = 3,
-            StartLine = 50,
-            Context = "Method DoSomething"
-        };
+        var largeDiff = string.Join("\n", Enumerable.Range(1, 50).Select(i => $"Line {i}"));
+        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false);
 
         // Act
-        var displayName = chunk.DisplayName;
+        var result = _chunker.ChunkDiff(diff, 50);
 
         // Assert
-        displayName.Should().Contain("test.cs");
-        displayName.Should().Contain("chunk 2/3");
-        displayName.Should().Contain("Method DoSomething");
+        result.Should().HaveCountGreaterThan(1);
+        result[1].DisplayName.Should().Contain("test.cs");
+        result[1].DisplayName.Should().Contain("chunk");
     }
 
     [Fact]
-    public void ChunkDiff_ShouldPreserveFilePath()
+    public void ChunkDiff_WithDiffHunkBoundary_ShouldSplitAtHunk()
     {
         // Arrange
-        var diff = new ReviewFileDiff("src/services/MyService.cs", "content", "hash1", false);
-        var maxChunkSize = 1000;
+        var diffText = @"@@ -1,5 +1,5 @@
+ line1
+ line2
++added line
+ line3
+" + new string('x', 200) + @"
+@@ -10,5 +10,7 @@ function foo()
+ more content
++another addition
+ end";
+        var diff = new ReviewFileDiff("test.cs", diffText, "hash123", false);
 
         // Act
-        var result = _chunker.ChunkDiff(diff, maxChunkSize);
+        var result = _chunker.ChunkDiff(diff, 250);
 
         // Assert
-        result.Should().OnlyContain(c => c.FilePath == "src/services/MyService.cs");
+        result.Should().HaveCountGreaterThan(1);
+        // Should split at diff hunk boundaries
+        result.Any(c => c.Context.Contains("Lines starting at")).Should().BeTrue();
     }
 
     [Fact]
@@ -231,118 +156,6 @@ public class DiffChunkerTests
         result[0].Content.Should().Be("");
     }
 
-    [Fact]
-    public void ChunkDiff_WithInterfaceBoundary_ShouldRecognizeInterface()
-    {
-        // Arrange
-        var diff = @"+public interface IFirstInterface
-+{
-+    void DoSomething();
-+}
-" + new string('x', 200) + @"
-+
-+public interface ISecondInterface
-+{
-+    void DoSomethingElse();
-+}";
-        var diffObj = new ReviewFileDiff("test.cs", diff, "hash1", false);
-        var maxChunkSize = 150;
-
-        // Act
-        var result = _chunker.ChunkDiff(diffObj, maxChunkSize);
-
-        // Assert
-        result.Should().HaveCountGreaterThan(0);
-    }
-
-    [Fact]
-    public void ChunkDiff_WithStructBoundary_ShouldRecognizeStruct()
-    {
-        // Arrange
-        var diff = @"+public struct FirstStruct
-+{
-+    public int Value;
-+}
-" + new string('x', 200) + @"
-+
-+public struct SecondStruct
-+{
-+    public string Name;
-+}";
-        var diffObj = new ReviewFileDiff("test.cs", diff, "hash1", false);
-        var maxChunkSize = 150;
-
-        // Act
-        var result = _chunker.ChunkDiff(diffObj, maxChunkSize);
-
-        // Assert
-        result.Should().HaveCountGreaterThan(0);
-    }
-
-    [Fact]
-    public void ChunkDiff_WithEnumBoundary_ShouldRecognizeEnum()
-    {
-        // Arrange
-        var diff = @"+public enum FirstEnum
-+{
-+    Value1,
-+    Value2
-+}
-" + new string('x', 200) + @"
-+
-+public enum SecondEnum
-+{
-+    OptionA,
-+    OptionB
-+}";
-        var diffObj = new ReviewFileDiff("test.cs", diff, "hash1", false);
-        var maxChunkSize = 150;
-
-        // Act
-        var result = _chunker.ChunkDiff(diffObj, maxChunkSize);
-
-        // Assert
-        result.Should().HaveCountGreaterThan(0);
-    }
-
-    [Fact]
-    public void ChunkDiff_WithAsyncMethod_ShouldRecognizeAsyncMethod()
-    {
-        // Arrange
-        var diff = @"+public class TestClass
-+{
-+    public async Task FirstMethodAsync()
-+    {
-+        await Task.Delay(100);
-+    }
-+}";
-        var diffObj = new ReviewFileDiff("test.cs", diff, "hash1", false);
-        var maxChunkSize = 1000;
-
-        // Act
-        var result = _chunker.ChunkDiff(diffObj, maxChunkSize);
-
-        // Assert
-        result.Should().HaveCount(1);
-    }
-
-    [Fact]
-    public void ChunkDiff_WithStaticClass_ShouldRecognizeStatic()
-    {
-        // Arrange
-        var diff = @"+public static class HelperClass
-+{
-+    public static void DoSomething() { }
-+}";
-        var diffObj = new ReviewFileDiff("test.cs", diff, "hash1", false);
-        var maxChunkSize = 1000;
-
-        // Act
-        var result = _chunker.ChunkDiff(diffObj, maxChunkSize);
-
-        // Assert
-        result.Should().HaveCount(1);
-    }
 
     [Fact]
     public void ChunkDiff_ShouldLogChunkingOperation()
@@ -367,11 +180,12 @@ public class DiffChunkerTests
     }
 
     [Fact]
-    public void ChunkDiff_WithVeryLargeSingleLine_ShouldSplitAppropriately()
+    public void ChunkDiff_WithVeryLargeDiff_ShouldSplitAppropriately()
     {
-        // Arrange
-        var largeLine = new string('x', 500);
-        var diff = new ReviewFileDiff("test.cs", largeLine, "hash1", false);
+        // Arrange - create a diff with content that exceeds max size
+        var lines = Enumerable.Range(1, 20).Select(i => $"+Line {i} with some content");
+        var largeDiff = string.Join("\n", lines);
+        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false);
         var maxChunkSize = 100;
 
         // Act
@@ -379,5 +193,6 @@ public class DiffChunkerTests
 
         // Assert
         result.Should().HaveCountGreaterThan(1);
+        result.All(c => c.Content.Length <= maxChunkSize * 1.5).Should().BeTrue(); // Allow some overflow
     }
 }

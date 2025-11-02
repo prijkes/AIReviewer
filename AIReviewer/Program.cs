@@ -34,7 +34,7 @@ internal static class Program
             {
                 // Load configuration from settings.ini + environment variables
                 // This is done early so we can use logging for diagnostic messages
-                services.AddSingleton<MsOptions.IOptions<ReviewerOptions>>(sp =>
+                services.AddSingleton(sp =>
                 {
                     var logger = sp.GetService<ILogger<ReviewerOptions>>();
                     

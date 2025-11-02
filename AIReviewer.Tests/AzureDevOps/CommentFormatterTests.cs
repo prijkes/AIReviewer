@@ -253,14 +253,14 @@ public class CommentFormatterTests
         var formatted = CommentFormatter.FormatStateThread(result);
 
         // Assert
-        formatted.Should().Contain("Error");
+        formatted.Should().Contain("\"severity\":2");
     }
 
     [Fact]
     public void FormatStateThread_WithNoIssues_ShouldReturnValidJson()
     {
         // Arrange
-        var result = new ReviewPlanResult(new List<ReviewIssue>(), 0, 0, 3);
+        var result = new ReviewPlanResult([], 0, 0, 3);
 
         // Act
         var formatted = CommentFormatter.FormatStateThread(result);

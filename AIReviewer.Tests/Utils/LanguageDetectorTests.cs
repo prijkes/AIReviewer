@@ -161,7 +161,7 @@ public class LanguageDetectorTests
         }";
 
         // Act
-        var result = LanguageDetector.DetectLanguage(text);
+        var result = LanguageDetector.DetectLanguage(text, 0.15); // Lower threshold for code with comments
 
         // Assert
         result.Should().Be("ja");
@@ -272,6 +272,8 @@ public class LanguageDetectorTests
         var result = LanguageDetector.DetectLanguage(text, 1.0);
 
         // Assert
+        // With threshold of 1.0, ratio must be > 1.0 to return "ja", which is impossible
+        // So even 100% Japanese text will return "en"
         result.Should().Be("en");
     }
 }

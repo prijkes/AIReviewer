@@ -44,12 +44,25 @@ public class ReviewerOptionsValidatorTests
     {
         // Arrange
         var options = CreateValidOptions();
+        
+        // Create a temporary policy file for the test
+        var policyPath = Path.Combine(AppContext.BaseDirectory, "policy.md");
+        File.WriteAllText(policyPath, "# Test Policy");
 
-        // Act
-        var errors = ReviewerOptionsValidator.Validate(options);
+        try
+        {
+            // Act
+            var errors = ReviewerOptionsValidator.Validate(options);
 
-        // Assert
-        errors.Should().BeEmpty();
+            // Assert
+            errors.Should().BeEmpty();
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(policyPath))
+                File.Delete(policyPath);
+        }
     }
 
     [Fact]
@@ -369,20 +382,33 @@ public class ReviewerOptionsValidatorTests
     {
         // Arrange
         var options = CreateValidOptions();
+        
+        // Create a temporary policy file for the test
+        var policyPath = Path.Combine(AppContext.BaseDirectory, "policy.md");
+        File.WriteAllText(policyPath, "# Test Policy");
 
-        // Act
-        var result = ReviewerOptionsValidator.ValidateAndLog(options, _loggerMock.Object);
+        try
+        {
+            // Act
+            var result = ReviewerOptionsValidator.ValidateAndLog(options, _loggerMock.Object);
 
-        // Assert
-        result.Should().BeTrue();
-        _loggerMock.Verify(
-            x => x.Log(
-                LogLevel.Information,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("validation passed")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
+            // Assert
+            result.Should().BeTrue();
+            _loggerMock.Verify(
+                x => x.Log(
+                    LogLevel.Information,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("validation passed")),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once);
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(policyPath))
+                File.Delete(policyPath);
+        }
     }
 
     [Fact]

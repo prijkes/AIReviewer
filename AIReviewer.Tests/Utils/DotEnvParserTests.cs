@@ -4,11 +4,13 @@ namespace AIReviewer.Tests.Utils;
 
 public class DotEnvParserTests : IDisposable
 {
-    private readonly List<string> _testFiles = new();
-    private readonly Dictionary<string, string?> _originalEnvVars = new();
+    private readonly List<string> _testFiles = [];
+    private readonly Dictionary<string, string?> _originalEnvVars = [];
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
+
         // Clean up test files
         foreach (var file in _testFiles)
         {

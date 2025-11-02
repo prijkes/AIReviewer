@@ -40,8 +40,8 @@ public class DiffServiceTests
         
         var changes = new GitPullRequestIterationChanges
         {
-            ChangeEntries = new List<GitPullRequestChange>
-            {
+            ChangeEntries =
+            [
                 new()
                 {
                     Item = new GitItem
@@ -50,7 +50,7 @@ public class DiffServiceTests
                         GitObjectType = GitObjectType.Blob
                     }
                 }
-            }
+            ]
         };
 
         _adoClientMock
@@ -88,8 +88,8 @@ public class DiffServiceTests
         
         var changes = new GitPullRequestIterationChanges
         {
-            ChangeEntries = new List<GitPullRequestChange>
-            {
+            ChangeEntries =
+            [
                 new()
                 {
                     Item = new GitItem
@@ -98,7 +98,7 @@ public class DiffServiceTests
                         GitObjectType = GitObjectType.Tree // Directory, not blob
                     }
                 }
-            }
+            ]
         };
 
         _adoClientMock
@@ -125,8 +125,8 @@ public class DiffServiceTests
         
         var changes = new GitPullRequestIterationChanges
         {
-            ChangeEntries = new List<GitPullRequestChange>
-            {
+            ChangeEntries =
+            [
                 new()
                 {
                     Item = new GitItem
@@ -135,7 +135,7 @@ public class DiffServiceTests
                         GitObjectType = GitObjectType.Blob
                     }
                 }
-            }
+            ]
         };
 
         _adoClientMock
@@ -171,8 +171,8 @@ public class DiffServiceTests
         
         var changes = new GitPullRequestIterationChanges
         {
-            ChangeEntries = new List<GitPullRequestChange>
-            {
+            ChangeEntries =
+            [
                 new()
                 {
                     Item = new GitItem
@@ -181,7 +181,7 @@ public class DiffServiceTests
                         GitObjectType = GitObjectType.Blob
                     }
                 }
-            }
+            ]
         };
 
         _adoClientMock
@@ -217,8 +217,8 @@ public class DiffServiceTests
         
         var changes = new GitPullRequestIterationChanges
         {
-            ChangeEntries = new List<GitPullRequestChange>
-            {
+            ChangeEntries =
+            [
                 new()
                 {
                     Item = new GitItem
@@ -235,7 +235,7 @@ public class DiffServiceTests
                         GitObjectType = GitObjectType.Blob
                     }
                 }
-            }
+            ]
         };
 
         _adoClientMock
@@ -346,8 +346,8 @@ public class DiffServiceTests
         
         var changes = new GitPullRequestIterationChanges
         {
-            ChangeEntries = new List<GitPullRequestChange>
-            {
+            ChangeEntries =
+            [
                 new()
                 {
                     Item = new GitItem
@@ -356,7 +356,7 @@ public class DiffServiceTests
                         GitObjectType = GitObjectType.Blob
                     }
                 }
-            }
+            ]
         };
 
         _adoClientMock
@@ -383,8 +383,8 @@ public class DiffServiceTests
         
         var changes = new GitPullRequestIterationChanges
         {
-            ChangeEntries = new List<GitPullRequestChange>
-            {
+            ChangeEntries =
+            [
                 new()
                 {
                     Item = new GitItem
@@ -401,7 +401,7 @@ public class DiffServiceTests
                         GitObjectType = GitObjectType.Blob
                     }
                 }
-            }
+            ]
         };
 
         _adoClientMock
@@ -437,8 +437,8 @@ public class DiffServiceTests
         
         var changes = new GitPullRequestIterationChanges
         {
-            ChangeEntries = new List<GitPullRequestChange>
-            {
+            ChangeEntries =
+            [
                 new()
                 {
                     Item = new GitItem
@@ -447,7 +447,7 @@ public class DiffServiceTests
                         GitObjectType = GitObjectType.Blob
                     }
                 }
-            }
+            ]
         };
 
         _adoClientMock
