@@ -44,33 +44,34 @@ public static class SettingsLoader
         }
 
         // Create options and populate from INI
-        var options = new ReviewerOptions();
-        
-        // [AI] section
-        options.AiFoundryDeployment = GetIniValue(config, "AI", "Deployment", logger);
-        options.AiTemperature = GetIniDouble(config, "AI", "Temperature", logger);
-        options.AiMaxTokens = GetIniInt(config, "AI", "MaxTokens", logger);
-        
-        // [FunctionCalling] section
-        options.EnableFunctionCalling = GetIniBool(config, "FunctionCalling", "Enabled", logger);
-        options.MaxFunctionCalls = GetIniInt(config, "FunctionCalling", "MaxCalls", logger);
-        
-        // [Review] section
-        options.DryRun = GetIniBool(config, "Review", "DryRun", logger);
-        options.ReviewScope = GetIniValue(config, "Review", "Scope", logger);
-        options.WarnBudget = GetIniInt(config, "Review", "WarnBudget", logger);
-        options.PolicyPath = GetIniValue(config, "Review", "PolicyPath", logger);
-        
-        // [Files] section
-        options.MaxFilesToReview = GetIniInt(config, "Files", "MaxFilesToReview", logger);
-        options.MaxIssuesPerFile = GetIniInt(config, "Files", "MaxIssuesPerFile", logger);
-        options.MaxFileBytes = GetIniSize(config, "Files", "MaxFileBytes", logger);
-        options.MaxDiffBytes = GetIniSize(config, "Files", "MaxDiffBytes", logger);
-        options.MaxPromptDiffBytes = GetIniSize(config, "Files", "MaxPromptDiffBytes", logger);
-        options.MaxCommitMessagesToReview = GetIniInt(config, "Files", "MaxCommitMessagesToReview", logger);
-        
-        // [Language] section
-        options.JapaneseDetectionThreshold = GetIniDouble(config, "Language", "JapaneseDetectionThreshold", logger);
+        var options = new ReviewerOptions
+        {
+            // [AI] section
+            AiFoundryDeployment = GetIniValue(config, "AI", "Deployment", logger),
+            AiTemperature = GetIniDouble(config, "AI", "Temperature", logger),
+            AiMaxTokens = GetIniInt(config, "AI", "MaxTokens", logger),
+
+            // [FunctionCalling] section
+            EnableFunctionCalling = GetIniBool(config, "FunctionCalling", "Enabled", logger),
+            MaxFunctionCalls = GetIniInt(config, "FunctionCalling", "MaxCalls", logger),
+
+            // [Review] section
+            DryRun = GetIniBool(config, "Review", "DryRun", logger),
+            ReviewScope = GetIniValue(config, "Review", "Scope", logger),
+            WarnBudget = GetIniInt(config, "Review", "WarnBudget", logger),
+            PolicyPath = GetIniValue(config, "Review", "PolicyPath", logger),
+
+            // [Files] section
+            MaxFilesToReview = GetIniInt(config, "Files", "MaxFilesToReview", logger),
+            MaxIssuesPerFile = GetIniInt(config, "Files", "MaxIssuesPerFile", logger),
+            MaxFileBytes = GetIniSize(config, "Files", "MaxFileBytes", logger),
+            MaxDiffBytes = GetIniSize(config, "Files", "MaxDiffBytes", logger),
+            MaxPromptDiffBytes = GetIniSize(config, "Files", "MaxPromptDiffBytes", logger),
+            MaxCommitMessagesToReview = GetIniInt(config, "Files", "MaxCommitMessagesToReview", logger),
+
+            // [Language] section
+            JapaneseDetectionThreshold = GetIniDouble(config, "Language", "JapaneseDetectionThreshold", logger)
+        };
 
         logger?.LogInformation("Successfully loaded static settings from {IniPath}", iniPath);
         
