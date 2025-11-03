@@ -9,7 +9,7 @@ namespace AIReviewer.AI;
 /// Provides context retrieval functions that can be called by the AI during code review.
 /// These functions allow the AI to gather additional information about the codebase.
 /// </summary>
-public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetriever> logger, AdoSdkClient adoClient)
+public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetriever> logger, IAdoSdkClient adoClient)
 {
     private PullRequestContext? _currentPrContext;
 

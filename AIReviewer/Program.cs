@@ -74,7 +74,7 @@ internal static class Program
 
                 services.AddSingleton<PolicyLoader>();
                 services.AddSingleton<RetryPolicyFactory>();
-                services.AddSingleton<AdoSdkClient>();
+                services.AddSingleton<IAdoSdkClient, AdoSdkClient>();
                 services.AddSingleton<CommentService>();
                 services.AddSingleton<ApprovalService>();
                 services.AddSingleton<DiffService>();
@@ -95,15 +95,10 @@ internal static class Program
 /// <summary>
 /// Simple wrapper to provide IOptionsMonitor from a static value.
 /// </summary>
-internal sealed class OptionsMonitorWrapper<T> : MsOptions.IOptionsMonitor<T>
+internal sealed class OptionsMonitorWrapper<T>(T value) : MsOptions.IOptionsMonitor<T>
 {
-    private readonly T _value;
-    
-    public OptionsMonitorWrapper(T value)
-    {
-        _value = value;
-    }
-    
+    private readonly T _value = value;
+
     public T CurrentValue => _value;
     public T Get(string? name) => _value;
     public IDisposable? OnChange(Action<T, string?> listener) => null;

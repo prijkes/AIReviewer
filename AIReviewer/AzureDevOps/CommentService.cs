@@ -16,10 +16,8 @@ namespace AIReviewer.AzureDevOps;
 /// <param name="logger">Logger for diagnostic information.</param>
 /// <param name="adoClient">Client for Azure DevOps operations.</param>
 /// <param name="retryPolicy">Factory for creating retry policies.</param>
-public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient adoClient, RetryPolicyFactory retryPolicy)
+public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient adoClient, RetryPolicyFactory retryPolicy)
 {
-
-
     /// <summary>
     /// Applies the review results by creating, updating, or resolving comment threads on the pull request.
     /// </summary>
@@ -42,11 +40,11 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
             }
             else
             {
-                await CreateThreadAsync(pr, iteration, issue, cancellationToken);
+                await CreateThreadAsync(pr, issue, cancellationToken);
             }
         }
 
-        await ResolveClearedThreadsAsync(pr, iteration, result, botThreads, cancellationToken);
+        await ResolveClearedThreadsAsync(pr, result, botThreads, cancellationToken);
         await UpsertStateThreadAsync(pr, result, botThreads, cancellationToken);
     }
 
@@ -54,11 +52,10 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
     /// Creates a new comment thread for an issue that hasn't been reported before.
     /// </summary>
     /// <param name="pr">The pull request context.</param>
-    /// <param name="iteration">The current PR iteration.</param>
     /// <param name="issue">The issue to create a thread for.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    private async Task CreateThreadAsync(PullRequestContext pr, GitPullRequestIteration iteration, ReviewIssue issue, CancellationToken cancellationToken)
+    private async Task CreateThreadAsync(PullRequestContext pr, ReviewIssue issue, CancellationToken cancellationToken)
     {
         var thread = new GitPullRequestCommentThread
         {
@@ -121,12 +118,11 @@ public sealed class CommentService(ILogger<CommentService> logger, AdoSdkClient 
     /// Marks them as fixed to indicate the issue has been addressed.
     /// </summary>
     /// <param name="pr">The pull request context.</param>
-    /// <param name="iteration">The current PR iteration.</param>
     /// <param name="result">The current review results.</param>
     /// <param name="botThreads">All bot-created threads.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    private async Task ResolveClearedThreadsAsync(PullRequestContext pr, GitPullRequestIteration iteration, ReviewPlanResult result, List<GitPullRequestCommentThread> botThreads, CancellationToken cancellationToken)
+    private async Task ResolveClearedThreadsAsync(PullRequestContext pr, ReviewPlanResult result, List<GitPullRequestCommentThread> botThreads, CancellationToken cancellationToken)
     {
         var remainingFingerprints = result.Issues.Select(i => i.Fingerprint).ToHashSet();
         var closed = new List<int>();

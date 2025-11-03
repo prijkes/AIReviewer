@@ -20,7 +20,7 @@ namespace AIReviewer;
 public sealed class ReviewerHostedService(
     ILogger<ReviewerHostedService> logger,
     IHostApplicationLifetime lifetime,
-    AdoSdkClient adoClient,
+    IAdoSdkClient adoClient,
     DiffService diffService,
     ReviewPlanner planner,
     CommentService commentService,

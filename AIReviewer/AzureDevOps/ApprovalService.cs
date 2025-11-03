@@ -14,7 +14,7 @@ namespace AIReviewer.AzureDevOps;
 /// </remarks>
 /// <param name="logger">Logger for diagnostic information.</param>
 /// <param name="adoClient">Client for Azure DevOps operations.</param>
-public sealed class ApprovalService(ILogger<ApprovalService> logger, AdoSdkClient adoClient)
+public sealed class ApprovalService(ILogger<ApprovalService> logger, IAdoSdkClient adoClient)
 {
 
     /// <summary>
