@@ -187,9 +187,9 @@ public static class SettingsLoader
         // Files section
         OverrideIfSet("FILES_MAXFILESTOREVIEW", v => options.MaxFilesToReview = int.Parse(v), logger);
         OverrideIfSet("FILES_MAXISSUESPERFILE", v => options.MaxIssuesPerFile = int.Parse(v), logger);
-        OverrideIfSet("FILES_MAXFILEBYTES", v => options.MaxFileBytes = int.Parse(v), logger);
-        OverrideIfSet("FILES_MAXDIFFBYTES", v => options.MaxDiffBytes = int.Parse(v), logger);
-        OverrideIfSet("FILES_MAXPROMPTDIFFBYTES", v => options.MaxPromptDiffBytes = int.Parse(v), logger);
+        OverrideIfSet("FILES_MAXFILEBYTES", v => options.MaxFileBytes = SizeParser.ParseToBytes(v), logger);
+        OverrideIfSet("FILES_MAXDIFFBYTES", v => options.MaxDiffBytes = SizeParser.ParseToBytes(v), logger);
+        OverrideIfSet("FILES_MAXPROMPTDIFFBYTES", v => options.MaxPromptDiffBytes = SizeParser.ParseToBytes(v), logger);
         OverrideIfSet("FILES_MAXCOMMITMESSAGESTOREVIEW", v => options.MaxCommitMessagesToReview = int.Parse(v), logger);
         
         // Language section
