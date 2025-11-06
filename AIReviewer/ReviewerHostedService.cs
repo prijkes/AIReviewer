@@ -42,10 +42,35 @@ public sealed class ReviewerHostedService(
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            logger.LogInformation("Starting AI PR review (DryRun: {DryRun})", _options.DryRun);
-            var policy = await policyLoader.LoadAsync(_options.PolicyPath, cancellationToken);
-
+            logger.LogInformation("Starting AI PR review (DryRun: {DryRun}, OnlyReviewIfRequiredReviewer: {OnlyReviewIfRequiredReviewer})", 
+                _options.DryRun, _options.OnlyReviewIfRequiredReviewer);
+            
             var pr = await adoClient.GetPullRequestContextAsync(cancellationToken);
+            
+            // Check if bot must be a required reviewer
+            if (_options.OnlyReviewIfRequiredReviewer)
+            {
+                var currentIdentity = adoClient.GetAuthorizedIdentity();
+                var reviewers = await adoClient.Git.GetPullRequestReviewersAsync(
+                    pr.Repository.Id, 
+                    pr.PullRequest.PullRequestId, 
+                    cancellationToken: cancellationToken);
+                
+                var botReviewer = reviewers.FirstOrDefault(r => r.UniqueName == currentIdentity.UniqueName);
+                var isRequiredReviewer = botReviewer?.IsRequired ?? false;
+                
+                if (!isRequiredReviewer)
+                {
+                    logger.LogInformation(
+                        "Skipping review: OnlyReviewIfRequiredReviewer is enabled and bot user '{BotUser}' is not a required reviewer on this PR",
+                        currentIdentity.UniqueName);
+                    return;
+                }
+                
+                logger.LogInformation("Bot user '{BotUser}' is a required reviewer, proceeding with review", currentIdentity.UniqueName);
+            }
+            
+            var policy = await policyLoader.LoadAsync(_options.PolicyPath, cancellationToken);
             logger.LogInformation(
                 "Loaded PR {Id} - {Title} [{Source} -> {Target}]",
                 pr.PullRequest.PullRequestId,

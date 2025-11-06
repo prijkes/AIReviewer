@@ -108,6 +108,14 @@ public sealed class ReviewerOptions
     public bool DryRun { get; set; }
 
     /// <summary>
+    /// When true, only run the review if the PAT user has been added as a required reviewer to the PR.
+    /// If the PAT user is not a required reviewer, the review is skipped entirely.
+    /// Must be configured in appsettings.json or via environment variable.
+    /// </summary>
+    [Required]
+    public bool OnlyReviewIfRequiredReviewer { get; set; }
+
+    /// <summary>
     /// Scope of files to review.
     /// Must be configured in appsettings.json or via environment variable.
     /// </summary>

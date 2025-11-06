@@ -57,6 +57,7 @@ public static class SettingsLoader
 
             // [Review] section
             DryRun = GetIniBool(config, "Review", "DryRun", logger),
+            OnlyReviewIfRequiredReviewer = GetIniBool(config, "Review", "OnlyReviewIfRequiredReviewer", logger),
             ReviewScope = GetIniValue(config, "Review", "Scope", logger),
             WarnBudget = GetIniInt(config, "Review", "WarnBudget", logger),
             PolicyPath = GetIniValue(config, "Review", "PolicyPath", logger),
@@ -178,6 +179,7 @@ public static class SettingsLoader
         
         // Review section
         OverrideIfSet("REVIEW_DRYRUN", v => options.DryRun = bool.Parse(v), logger);
+        OverrideIfSet("REVIEW_ONLYREVIEWIFREQUIREDREVIEWER", v => options.OnlyReviewIfRequiredReviewer = bool.Parse(v), logger);
         OverrideIfSet("REVIEW_SCOPE", v => options.ReviewScope = v, logger);
         OverrideIfSet("REVIEW_WARNBUDGET", v => options.WarnBudget = int.Parse(v), logger);
         OverrideIfSet("REVIEW_POLICYPATH", v => options.PolicyPath = v, logger);

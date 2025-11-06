@@ -58,8 +58,13 @@ public sealed class DiffService(ILogger<DiffService> logger, IAdoSdkClient adoCl
         {
             if (change.Item is not GitItem gitItem) continue;
 
-            var path = gitItem.Path ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(path)) continue;
+            // For deleted files, path is empty - use OriginalPath instead
+            var path = gitItem.Path ?? change.OriginalPath ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                logger.LogDebug("Skipping change entry with no path or originalPath");
+                continue;
+            }
 
             // Check if binary based on file type
             var isBinary = gitItem.GitObjectType != GitObjectType.Blob;
