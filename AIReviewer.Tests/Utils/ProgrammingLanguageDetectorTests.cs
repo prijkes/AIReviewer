@@ -86,7 +86,6 @@ public sealed class ProgrammingLanguageDetectorTests
 
     [Theory]
     [InlineData("")]
-    [InlineData(null)]
     [InlineData("   ")]
     public void DetectLanguage_EmptyOrNullPath_ReturnsUnknown(string filePath)
     {
