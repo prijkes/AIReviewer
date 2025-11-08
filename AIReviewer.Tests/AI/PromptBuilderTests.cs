@@ -2,6 +2,7 @@ using AIReviewer.AI;
 using AIReviewer.Diff;
 using AIReviewer.Options;
 using AIReviewer.Review;
+using AIReviewer.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,6 +12,7 @@ public class PromptBuilderTests
 {
     private readonly Mock<ILogger<PromptBuilder>> _loggerMock;
     private readonly Mock<IOptionsMonitor<ReviewerOptions>> _optionsMock;
+    private readonly Mock<PromptLoader> _promptLoaderMock;
     private readonly ReviewerOptions _options;
     private readonly PromptBuilder _promptBuilder;
 
@@ -24,48 +26,77 @@ public class PromptBuilderTests
             MaxCommitMessagesToReview = 5
         };
         _optionsMock.Setup(x => x.CurrentValue).Returns(_options);
-        _promptBuilder = new PromptBuilder(_loggerMock.Object, _optionsMock.Object);
+        
+        // Mock PromptLoader
+        var promptLoaderLoggerMock = new Mock<ILogger<PromptLoader>>();
+        _promptLoaderMock = new Mock<PromptLoader>(promptLoaderLoggerMock.Object, _optionsMock.Object);
+        
+        // Setup mock responses for different prompts
+        _promptLoaderMock.Setup(x => x.LoadSystemPromptAsync(It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProgrammingLanguageDetector.ProgrammingLanguage lang, CancellationToken ct) =>
+                lang == ProgrammingLanguageDetector.ProgrammingLanguage.CSharp
+                    ? "You are an expert C#/.NET code reviewer"
+                    : lang == ProgrammingLanguageDetector.ProgrammingLanguage.Cpp
+                        ? "You are an expert C++ code reviewer"
+                        : "You are an expert code reviewer");
+        
+        _promptLoaderMock.Setup(x => x.LoadLanguageInstructionAsync("en", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("IMPORTANT: Provide all review feedback in English language.");
+        
+        _promptLoaderMock.Setup(x => x.LoadLanguageInstructionAsync("ja", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("IMPORTANT: Provide all review feedback in Japanese language.");
+        
+        _promptLoaderMock.Setup(x => x.LoadFileReviewInstructionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Apply the policy rubric. Report up to 5 actionable issues. Leave summary empty.");
+        
+        _promptLoaderMock.Setup(x => x.LoadMetadataReviewInstructionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Review the PR metadata for hygiene and completeness.\n\nMetadata review rubric: Ensure descriptive title, summary of changes, tests documented.");
+        
+        _promptBuilder = new PromptBuilder(_loggerMock.Object, _optionsMock.Object, _promptLoaderMock.Object);
     }
 
     [Fact]
-    public void BuildFileReviewSystemPrompt_WithEnglish_ShouldIncludeEnglishInstruction()
+    public async Task BuildFileReviewSystemPrompt_WithEnglish_ShouldIncludeEnglishInstruction()
     {
         // Arrange
         var policy = "Test policy";
         var language = "en";
+        var programmingLanguage = ProgrammingLanguageDetector.ProgrammingLanguage.CSharp;
 
         // Act
-        var result = _promptBuilder.BuildFileReviewSystemPrompt(policy, language);
+        var result = await _promptBuilder.BuildFileReviewSystemPromptAsync(policy, language, programmingLanguage, CancellationToken.None);
 
         // Assert
         result.Should().Contain("Test policy");
         result.Should().Contain("Provide all review feedback in English language");
-        result.Should().NotContain("Japanese");
+        result.Should().Contain("C#/.NET");
     }
 
     [Fact]
-    public void BuildFileReviewSystemPrompt_WithJapanese_ShouldIncludeJapaneseInstruction()
+    public async Task BuildFileReviewSystemPrompt_WithJapanese_ShouldIncludeJapaneseInstruction()
     {
         // Arrange
         var policy = "テストポリシー";
         var language = "ja";
+        var programmingLanguage = ProgrammingLanguageDetector.ProgrammingLanguage.Cpp;
 
         // Act
-        var result = _promptBuilder.BuildFileReviewSystemPrompt(policy, language);
+        var result = await _promptBuilder.BuildFileReviewSystemPromptAsync(policy, language, programmingLanguage, CancellationToken.None);
 
         // Assert
         result.Should().Contain("テストポリシー");
         result.Should().Contain("Provide all review feedback in Japanese language");
+        result.Should().Contain("C++");
     }
 
     [Fact]
-    public void BuildFileReviewUserPrompt_WithSmallDiff_ShouldIncludeFullDiff()
+    public async Task BuildFileReviewUserPrompt_WithSmallDiff_ShouldIncludeFullDiff()
     {
         // Arrange
         var diff = new ReviewFileDiff("test.cs", "small diff content", "hash123", false);
 
         // Act
-        var result = _promptBuilder.BuildFileReviewUserPrompt(diff);
+        var result = await _promptBuilder.BuildFileReviewUserPromptAsync(diff, CancellationToken.None);
 
         // Assert
         result.Should().Contain("test.cs");
@@ -74,14 +105,14 @@ public class PromptBuilderTests
     }
 
     [Fact]
-    public void BuildFileReviewUserPrompt_WithLargeDiff_ShouldTruncateDiff()
+    public async Task BuildFileReviewUserPrompt_WithLargeDiff_ShouldTruncateDiff()
     {
         // Arrange
         var largeDiff = new string('x', 2000);
         var diff = new ReviewFileDiff("test.cs", largeDiff, "hash123", false);
 
         // Act
-        var result = _promptBuilder.BuildFileReviewUserPrompt(diff);
+        var result = await _promptBuilder.BuildFileReviewUserPromptAsync(diff, CancellationToken.None);
 
         // Assert
         result.Should().Contain("test.cs");
@@ -90,14 +121,14 @@ public class PromptBuilderTests
     }
 
     [Fact]
-    public void BuildMetadataReviewSystemPrompt_ShouldIncludeMetadataRubric()
+    public async Task BuildMetadataReviewSystemPrompt_ShouldIncludeMetadataRubric()
     {
         // Arrange
         var policy = "Test policy";
         var language = "en";
 
         // Act
-        var result = _promptBuilder.BuildMetadataReviewSystemPrompt(policy, language);
+        var result = await _promptBuilder.BuildMetadataReviewSystemPromptAsync(policy, language, CancellationToken.None);
 
         // Assert
         result.Should().Contain("Test policy");

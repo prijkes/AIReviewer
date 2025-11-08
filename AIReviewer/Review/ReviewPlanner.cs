@@ -2,6 +2,7 @@
 using AIReviewer.AzureDevOps.Models;
 using AIReviewer.Diff;
 using AIReviewer.Options;
+using AIReviewer.Policy;
 using AIReviewer.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -41,8 +42,9 @@ public sealed record ReviewPlanResult(IReadOnlyList<ReviewIssue> Issues, int Err
 /// <param name="logger">Logger for diagnostic information.</param>
 /// <param name="aiClient">AI client for performing code reviews.</param>
 /// <param name="contextRetriever">Context retriever for function calling support.</param>
+/// <param name="policyLoader">Policy loader for loading language-specific policies.</param>
 /// <param name="options">Configuration options for the reviewer.</param>
-public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiClient, ReviewContextRetriever contextRetriever, IOptionsMonitor<ReviewerOptions> options)
+public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiClient, ReviewContextRetriever contextRetriever, PolicyLoader policyLoader, IOptionsMonitor<ReviewerOptions> options)
 {
     private readonly ReviewerOptions _options = options.CurrentValue;
 
@@ -50,14 +52,15 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     /// Plans and executes the complete review process for a pull request.
     /// Reviews all file diffs and PR metadata, collecting issues from the AI.
     /// Files are reviewed in parallel for improved performance.
+    /// Language-specific prompts and policies are applied based on file type.
     /// </summary>
     /// <param name="pr">The pull request context.</param>
     /// <param name="iteration">The current PR iteration.</param>
     /// <param name="diffs">The list of file diffs to review.</param>
-    /// <param name="policy">The review policy to apply.</param>
+    /// <param name="basePolicyPath">The base policy file path.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A <see cref="ReviewPlanResult"/> containing all identified issues and counts.</returns>
-    public async Task<ReviewPlanResult> PlanAsync(PullRequestContext pr, GitPullRequestIteration iteration, IReadOnlyList<ReviewFileDiff> diffs, string policy, CancellationToken cancellationToken)
+    public async Task<ReviewPlanResult> PlanAsync(PullRequestContext pr, GitPullRequestIteration iteration, IReadOnlyList<ReviewFileDiff> diffs, string basePolicyPath, CancellationToken cancellationToken)
     {
         // Set PR context for function calling (if available)
         contextRetriever?.SetContext(pr);
@@ -89,15 +92,16 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
 
         // Review files in parallel
         var reviewTasks = diffsToReview.Select(diff => 
-            ReviewFileAsync(diff, policy, language, iteration.Id ?? 0, cancellationToken));
+            ReviewFileAsync(diff, basePolicyPath, language, iteration.Id ?? 0, cancellationToken));
 
         var fileResults = await Task.WhenAll(reviewTasks);
 
         // Flatten all issues
         var issues = fileResults.SelectMany(r => r).ToList();
 
-        // Review metadata
-        var metadataIssues = await ReviewMetadataAsync(pr, policy, language, iteration.Id, cancellationToken);
+        // Review metadata (use general policy for metadata)
+        var generalPolicy = await policyLoader.LoadAsync(basePolicyPath, cancellationToken);
+        var metadataIssues = await ReviewMetadataAsync(pr, generalPolicy, language, iteration.Id, cancellationToken);
         issues.AddRange(metadataIssues);
 
         var errorCount = issues.Count(i => i.Severity == IssueSeverity.Error);
@@ -108,10 +112,11 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
 
     /// <summary>
     /// Reviews a single file and returns the identified issues.
+    /// Detects the programming language and loads the appropriate policy.
     /// </summary>
     private async Task<List<ReviewIssue>> ReviewFileAsync(
         ReviewFileDiff diff, 
-        string policy, 
+        string basePolicyPath, 
         string language, 
         int iterationId, 
         CancellationToken cancellationToken)
@@ -120,7 +125,18 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
 
         try
         {
-            var aiResponse = await aiClient.ReviewAsync(policy, diff, language, cancellationToken);
+            // Detect programming language for the file
+            var programmingLanguage = ProgrammingLanguageDetector.DetectLanguage(diff.Path);
+            
+            // Log the detected programming language
+            logger.LogDebug("File {Path} detected as {Language}", 
+                diff.Path, 
+                ProgrammingLanguageDetector.GetDisplayName(programmingLanguage));
+
+            // Load language-specific policy
+            var policy = await policyLoader.LoadLanguageSpecificAsync(basePolicyPath, programmingLanguage, cancellationToken);
+
+            var aiResponse = await aiClient.ReviewAsync(policy, diff, language, programmingLanguage, cancellationToken);
             
             if (aiResponse.Issues.Count > _options.MaxIssuesPerFile)
             {

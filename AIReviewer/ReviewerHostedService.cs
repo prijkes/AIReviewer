@@ -25,7 +25,6 @@ public sealed class ReviewerHostedService(
     ReviewPlanner planner,
     CommentService commentService,
     ApprovalService approvalService,
-    PolicyLoader policyLoader,
     IOptionsMonitor<ReviewerOptions> options) : IHostedService
 {
     private readonly ReviewerOptions _options = options.CurrentValue;
@@ -70,7 +69,6 @@ public sealed class ReviewerHostedService(
                 logger.LogInformation("Bot user '{BotUser}' is a required reviewer, proceeding with review", currentIdentity.UniqueName);
             }
             
-            var policy = await policyLoader.LoadAsync(_options.PolicyPath, cancellationToken);
             logger.LogInformation(
                 "Loaded PR {Id} - {Title} [{Source} -> {Target}]",
                 pr.PullRequest.PullRequestId,
@@ -83,7 +81,8 @@ public sealed class ReviewerHostedService(
             
             logger.LogInformation("PR has {CommitCount} commits, {FileCount} files to review", pr.Commits.Length, diffs.Count);
 
-            var reviewResult = await planner.PlanAsync(pr, iteration, diffs, policy, cancellationToken);
+            // ReviewPlanner will load language-specific policies internally
+            var reviewResult = await planner.PlanAsync(pr, iteration, diffs, _options.PolicyPath, cancellationToken);
 
             if (!_options.DryRun)
             {

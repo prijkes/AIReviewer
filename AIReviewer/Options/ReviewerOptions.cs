@@ -179,6 +179,13 @@ public sealed class ReviewerOptions
     public string PolicyPath { get; set; } = string.Empty;
 
     /// <summary>
+    /// Base path to the prompts directory containing system, instruction, and language prompt templates.
+    /// Must be configured in appsettings.json or via environment variable.
+    /// </summary>
+    [Required]
+    public string PromptsBasePath { get; set; } = string.Empty;
+
+    /// <summary>
     /// Build source version (commit SHA) for inferring the pull request when AdoPullRequestId is not specified.
     /// </summary>
     public string? BuildSourceVersion { get; set; }

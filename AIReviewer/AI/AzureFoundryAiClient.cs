@@ -53,20 +53,23 @@ public sealed class AzureFoundryAiClient : IAiClient
     }
 
     /// <inheritdoc/>
-    public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, CancellationToken cancellationToken)
+    public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage, CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Requesting AI review for {Path} ({DiffSize} bytes) in language: {Language}",
-            fileDiff.Path, fileDiff.DiffText.Length, language);
+        _logger.LogDebug("Requesting AI review for {Path} ({DiffSize} bytes) in language: {Language}, programming language: {ProgrammingLanguage}",
+            fileDiff.Path, fileDiff.DiffText.Length, language, ProgrammingLanguageDetector.GetDisplayName(programmingLanguage));
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
         // Use ChatClient for structured outputs support
         var chatClient = _client.GetChatClient(_options.AiFoundryDeployment);
         
+        var systemPrompt = await _promptBuilder.BuildFileReviewSystemPromptAsync(policy, language, programmingLanguage, cancellationToken);
+        var userPrompt = await _promptBuilder.BuildFileReviewUserPromptAsync(fileDiff, cancellationToken);
+        
         var messages = new List<ChatMessage>
         {
-            new SystemChatMessage(_promptBuilder.BuildFileReviewSystemPrompt(policy, language)),
-            new UserChatMessage(_promptBuilder.BuildFileReviewUserPrompt(fileDiff))
+            new SystemChatMessage(systemPrompt),
+            new UserChatMessage(userPrompt)
         };
 
         var options = new ChatCompletionOptions
@@ -124,9 +127,11 @@ public sealed class AzureFoundryAiClient : IAiClient
         // Use ChatClient for structured outputs support
         var chatClient = _client.GetChatClient(_options.AiFoundryDeployment);
         
+        var systemPrompt = await _promptBuilder.BuildMetadataReviewSystemPromptAsync(policy, language, cancellationToken);
+        
         var messages = new List<ChatMessage>
         {
-            new SystemChatMessage(_promptBuilder.BuildMetadataReviewSystemPrompt(policy, language)),
+            new SystemChatMessage(systemPrompt),
             new UserChatMessage(_promptBuilder.BuildMetadataReviewUserPrompt(metadata))
         };
 

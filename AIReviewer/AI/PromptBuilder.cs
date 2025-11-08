@@ -1,6 +1,7 @@
 using AIReviewer.Diff;
 using AIReviewer.Options;
 using AIReviewer.Review;
+using AIReviewer.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,27 +10,22 @@ namespace AIReviewer.AI;
 /// <summary>
 /// Builds prompts for AI code review requests.
 /// Centralizes prompt construction logic for consistency and maintainability.
+/// Prompts are now loaded from external markdown files for easy editing without recompilation.
 /// </summary>
 public sealed class PromptBuilder
 {
     private readonly ILogger<PromptBuilder> _logger;
     private readonly ReviewerOptions _options;
-
-    /// <summary>
-    /// Base system prompt that instructs the AI on how to perform code reviews.
-    /// </summary>
-    private const string BaseSystemPrompt = """
-        You are an expert C#/.NET code reviewer bot enforcing security, correctness, performance, readability, and testability.
-        Evaluate only actionable issues. Do not include code content unless needed for fix_example.
-        """;
+    private readonly PromptLoader _promptLoader;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PromptBuilder"/> class.
     /// </summary>
-    public PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor<ReviewerOptions> options)
+    public PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor<ReviewerOptions> options, PromptLoader promptLoader)
     {
         _logger = logger;
         _options = options.CurrentValue;
+        _promptLoader = promptLoader;
     }
 
     /// <summary>
@@ -37,22 +33,28 @@ public sealed class PromptBuilder
     /// </summary>
     /// <param name="policy">The review policy to apply.</param>
     /// <param name="language">Language code for the review response.</param>
+    /// <param name="programmingLanguage">The programming language being reviewed.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>The complete system prompt.</returns>
-    public string BuildFileReviewSystemPrompt(string policy, string language)
+    public async Task<string> BuildFileReviewSystemPromptAsync(
+        string policy, 
+        string language, 
+        ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage,
+        CancellationToken cancellationToken)
     {
-        var languageInstruction = language == "ja"
-            ? "\n\nIMPORTANT: Provide all review feedback in Japanese language."
-            : "\n\nIMPORTANT: Provide all review feedback in English language.";
+        var basePrompt = await _promptLoader.LoadSystemPromptAsync(programmingLanguage, cancellationToken);
+        var languageInstruction = await _promptLoader.LoadLanguageInstructionAsync(language, cancellationToken);
 
-        return $"{BaseSystemPrompt}\n\nPolicy:\n{policy}{languageInstruction}";
+        return $"{basePrompt}\n\nPolicy:\n{policy}\n\n{languageInstruction}";
     }
 
     /// <summary>
     /// Builds a user prompt for reviewing a file diff.
     /// </summary>
     /// <param name="fileDiff">The file diff to review.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>The formatted user prompt.</returns>
-    public string BuildFileReviewUserPrompt(ReviewFileDiff fileDiff)
+    public async Task<string> BuildFileReviewUserPromptAsync(ReviewFileDiff fileDiff, CancellationToken cancellationToken)
     {
         var truncatedDiff = fileDiff.DiffText;
         if (fileDiff.DiffText.Length > _options.MaxPromptDiffBytes)
@@ -62,12 +64,14 @@ public sealed class PromptBuilder
                 fileDiff.Path, fileDiff.DiffText.Length, _options.MaxPromptDiffBytes);
         }
 
+        var instructions = await _promptLoader.LoadFileReviewInstructionAsync(cancellationToken);
+
         return $"""
             File: {fileDiff.Path}
             Unified Diff:
             {truncatedDiff}
 
-            Apply the policy rubric. Report up to 5 actionable issues. Leave summary empty.
+            {instructions}
             """;
     }
 
@@ -76,14 +80,16 @@ public sealed class PromptBuilder
     /// </summary>
     /// <param name="policy">The review policy to apply.</param>
     /// <param name="language">Language code for the review response.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>The complete system prompt.</returns>
-    public string BuildMetadataReviewSystemPrompt(string policy, string language)
+    public async Task<string> BuildMetadataReviewSystemPromptAsync(string policy, string language, CancellationToken cancellationToken)
     {
-        var languageInstruction = language == "ja"
-            ? "\n\nIMPORTANT: Provide all review feedback in Japanese language."
-            : "\n\nIMPORTANT: Provide all review feedback in English language.";
+        // Metadata review uses a generic prompt since it's not language-specific
+        var basePrompt = await _promptLoader.LoadSystemPromptAsync(ProgrammingLanguageDetector.ProgrammingLanguage.Unknown, cancellationToken);
+        var languageInstruction = await _promptLoader.LoadLanguageInstructionAsync(language, cancellationToken);
+        var metadataInstructions = await _promptLoader.LoadMetadataReviewInstructionAsync(cancellationToken);
 
-        return $"{BaseSystemPrompt}\n\nPolicy:\n{policy}\n\nMetadata review rubric: Ensure descriptive title, summary of changes, tests documented.{languageInstruction}";
+        return $"{basePrompt}\n\nPolicy:\n{policy}\n\n{metadataInstructions}\n\n{languageInstruction}";
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 ﻿using AIReviewer.Diff;
 using AIReviewer.Review;
 using AIReviewer.AzureDevOps.Models;
+using AIReviewer.Utils;
 
 namespace AIReviewer.AI;
 
@@ -15,9 +16,10 @@ public interface IAiClient
     /// <param name="policy">The review policy containing guidelines and rules.</param>
     /// <param name="fileDiff">The file diff to review.</param>
     /// <param name="language">The language code for the review response ("en" for English, "ja" for Japanese).</param>
+    /// <param name="programmingLanguage">The programming language of the file being reviewed.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A response containing the list of issues found.</returns>
-    Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, CancellationToken cancellationToken);
+    Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reviews pull request metadata (title, description, commits) for hygiene and completeness.

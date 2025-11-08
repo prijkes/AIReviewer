@@ -1,5 +1,6 @@
 using AIReviewer.Diff;
 using AIReviewer.Review;
+using AIReviewer.Utils;
 
 namespace AIReviewer.AI.Providers;
 
@@ -17,7 +18,7 @@ public interface IAiProvider
     /// <summary>
     /// Reviews a file diff using the AI provider.
     /// </summary>
-    Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, CancellationToken cancellationToken);
+    Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reviews pull request metadata using the AI provider.

@@ -73,6 +73,7 @@ internal static class Program
                 });
 
                 services.AddSingleton<PolicyLoader>();
+                services.AddSingleton<PromptLoader>();
                 services.AddSingleton<RetryPolicyFactory>();
                 services.AddSingleton<IAdoSdkClient, AdoSdkClient>();
                 services.AddSingleton<CommentService>();
