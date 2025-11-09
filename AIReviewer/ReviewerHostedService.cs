@@ -1,7 +1,6 @@
 ﻿using AIReviewer.AzureDevOps;
 using AIReviewer.Diff;
 using AIReviewer.Options;
-using AIReviewer.Policy;
 using AIReviewer.Review;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

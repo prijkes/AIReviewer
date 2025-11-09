@@ -135,13 +135,16 @@ public sealed class AzureFoundryAiClient : IAiClient
             new UserChatMessage(_promptBuilder.BuildMetadataReviewUserPrompt(metadata))
         };
 
+        var schema = AiResponseSchemaGenerator.GetResponseSchema();
+        
+        // Debug output: Log the full JSON schema being sent
+        _logger.LogInformation("JSON Schema being sent to API:\n{Schema}", schema.ToString());
+
         var options = new ChatCompletionOptions
         {
-            MaxOutputTokenCount = _options.AiMaxTokens,
-            Temperature = (float)_options.AiTemperature,
             ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
                 jsonSchemaFormatName: "ai_review_response",
-                jsonSchema: AiResponseSchemaGenerator.GetResponseSchema(),
+                jsonSchema: schema,
                 jsonSchemaIsStrict: true)
         };
 
@@ -150,7 +153,6 @@ public sealed class AzureFoundryAiClient : IAiClient
         
         return ParseResponse(content);
     }
-
 
     /// <summary>
     /// Parses the raw JSON response from the AI model into a structured review response.

@@ -8,6 +8,7 @@ using AIReviewer.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.CommandLine;
 using MsOptions = Microsoft.Extensions.Options;
 
 namespace AIReviewer;
@@ -17,9 +18,46 @@ namespace AIReviewer;
 /// </summary>
 internal static class Program
 {
-    private static async Task Main(string[] args)
+    private static async Task<int> Main(string[] args)
     {
-        var host = Host.CreateDefaultBuilder(args)
+        // Define command-line options using System.CommandLine
+        Option<string> settingsOption = new("--settings")
+        {
+            Description = "Path to settings.ini file",
+            DefaultValueFactory = _ => "settings.ini"
+        };
+        settingsOption.Aliases.Add("-s");
+
+        Option<string?> envOption = new("--env")
+        {
+            Description = "Path to .env file (optional)"
+        };
+        envOption.Aliases.Add("-e");
+
+        // Create root command
+        RootCommand rootCommand = new("AIReviewer - AI-powered pull request reviewer");
+        rootCommand.Options.Add(settingsOption);
+        rootCommand.Options.Add(envOption);
+
+        // Set the action handler
+        rootCommand.SetAction(async parseResult =>
+        {
+            var settingsPath = parseResult.GetValue(settingsOption)!;
+            var envPath = parseResult.GetValue(envOption);
+            await RunApplication(settingsPath, envPath);
+            return 0;
+        });
+
+        // Parse and invoke
+        return await rootCommand.Parse(args).InvokeAsync();
+    }
+
+    /// <summary>
+    /// Runs the main application with the specified configuration paths.
+    /// </summary>
+    private static async Task RunApplication(string settingsPath, string? envPath)
+    {
+        var host = Host.CreateDefaultBuilder([])
             .UseConsoleLifetime()
             .ConfigureLogging((ctx, logging) =>
             {
@@ -38,23 +76,29 @@ internal static class Program
                 {
                     var logger = sp.GetService<ILogger<ReviewerOptions>>();
                     
-                    // Load .env file if present (before loading settings)
-                    var envFile = Path.Combine(AppContext.BaseDirectory, ".env");
-                    var envData = DotEnvParser.Parse(envFile);
-                    if (envData.Count > 0)
+                    // Load .env file if specified (before loading settings)
+                    if (envPath != null)
                     {
-                        logger?.LogInformation("Loading {Count} environment variables from .env file", envData.Count);
-                        foreach (var (key, value) in envData)
+                        var envData = DotEnvParser.Parse(envPath);
+                        if (envData.Count > 0)
                         {
-                            if (!string.IsNullOrWhiteSpace(value))
+                            logger?.LogInformation("Loading {Count} environment variables from {EnvFile}", envData.Count, envPath);
+                            foreach (var (key, value) in envData)
                             {
-                                Environment.SetEnvironmentVariable(key, value);
+                                if (!string.IsNullOrWhiteSpace(value))
+                                {
+                                    Environment.SetEnvironmentVariable(key, value);
+                                }
                             }
+                        }
+                        else
+                        {
+                            logger?.LogWarning("No environment variables found in {EnvFile}", envPath);
                         }
                     }
                     
                     // Load settings from settings.ini + environment
-                    var options = SettingsLoader.Load(logger);
+                    var options = SettingsLoader.Load(logger, settingsPath);
                     
                     // Normalize paths
                     options.Normalize();

@@ -1,5 +1,4 @@
 using AIReviewer.Utils;
-using Xunit;
 
 namespace AIReviewer.Tests.Utils;
 

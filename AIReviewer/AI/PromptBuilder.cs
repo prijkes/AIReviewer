@@ -12,21 +12,12 @@ namespace AIReviewer.AI;
 /// Centralizes prompt construction logic for consistency and maintainability.
 /// Prompts are now loaded from external markdown files for easy editing without recompilation.
 /// </summary>
-public sealed class PromptBuilder
+/// <remarks>
+/// Initializes a new instance of the <see cref="PromptBuilder"/> class.
+/// </remarks>
+public sealed class PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor<ReviewerOptions> options, PromptLoader promptLoader)
 {
-    private readonly ILogger<PromptBuilder> _logger;
-    private readonly ReviewerOptions _options;
-    private readonly PromptLoader _promptLoader;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="PromptBuilder"/> class.
-    /// </summary>
-    public PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor<ReviewerOptions> options, PromptLoader promptLoader)
-    {
-        _logger = logger;
-        _options = options.CurrentValue;
-        _promptLoader = promptLoader;
-    }
+    private readonly ReviewerOptions _options = options.CurrentValue;
 
     /// <summary>
     /// Builds a system prompt for file review with policy and language instructions.
@@ -42,8 +33,8 @@ public sealed class PromptBuilder
         ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage,
         CancellationToken cancellationToken)
     {
-        var basePrompt = await _promptLoader.LoadSystemPromptAsync(programmingLanguage, cancellationToken);
-        var languageInstruction = await _promptLoader.LoadLanguageInstructionAsync(language, cancellationToken);
+        var basePrompt = await promptLoader.LoadSystemPromptAsync(programmingLanguage, cancellationToken);
+        var languageInstruction = await promptLoader.LoadLanguageInstructionAsync(language, cancellationToken);
 
         return $"{basePrompt}\n\nPolicy:\n{policy}\n\n{languageInstruction}";
     }
@@ -60,11 +51,11 @@ public sealed class PromptBuilder
         if (fileDiff.DiffText.Length > _options.MaxPromptDiffBytes)
         {
             truncatedDiff = fileDiff.DiffText[.._options.MaxPromptDiffBytes];
-            _logger.LogDebug("Truncating diff in prompt for {Path} ({Original} bytes -> {Truncated} bytes)",
+            logger.LogDebug("Truncating diff in prompt for {Path} ({Original} bytes -> {Truncated} bytes)",
                 fileDiff.Path, fileDiff.DiffText.Length, _options.MaxPromptDiffBytes);
         }
 
-        var instructions = await _promptLoader.LoadFileReviewInstructionAsync(cancellationToken);
+        var instructions = await promptLoader.LoadFileReviewInstructionAsync(cancellationToken);
 
         return $"""
             File: {fileDiff.Path}
@@ -85,9 +76,9 @@ public sealed class PromptBuilder
     public async Task<string> BuildMetadataReviewSystemPromptAsync(string policy, string language, CancellationToken cancellationToken)
     {
         // Metadata review uses a generic prompt since it's not language-specific
-        var basePrompt = await _promptLoader.LoadSystemPromptAsync(ProgrammingLanguageDetector.ProgrammingLanguage.Unknown, cancellationToken);
-        var languageInstruction = await _promptLoader.LoadLanguageInstructionAsync(language, cancellationToken);
-        var metadataInstructions = await _promptLoader.LoadMetadataReviewInstructionAsync(cancellationToken);
+        var basePrompt = await promptLoader.LoadSystemPromptAsync(ProgrammingLanguageDetector.ProgrammingLanguage.Unknown, cancellationToken);
+        var languageInstruction = await promptLoader.LoadLanguageInstructionAsync(language, cancellationToken);
+        var metadataInstructions = await promptLoader.LoadMetadataReviewInstructionAsync(cancellationToken);
 
         return $"{basePrompt}\n\nPolicy:\n{policy}\n\n{metadataInstructions}\n\n{languageInstruction}";
     }
@@ -103,7 +94,7 @@ public sealed class PromptBuilder
 
         if (metadata.CommitMessages.Count > _options.MaxCommitMessagesToReview)
         {
-            _logger.LogDebug("Truncating commit messages for metadata review ({Total} commits -> {Max} commits)",
+            logger.LogDebug("Truncating commit messages for metadata review ({Total} commits -> {Max} commits)",
                 metadata.CommitMessages.Count, _options.MaxCommitMessagesToReview);
         }
 

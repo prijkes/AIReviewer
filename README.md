@@ -69,6 +69,53 @@ AIReviewer integrates with your Azure DevOps pull request workflow to provide au
    dotnet run --project AIReviewer/AIReviewer.csproj
    ```
 
+### Command Line Options
+
+AIReviewer supports command-line arguments for specifying custom configuration file paths using the official Microsoft `System.CommandLine` library.
+
+```bash
+# View help
+dotnet run --project AIReviewer/AIReviewer.csproj -- --help
+
+# Use default settings.ini and no .env file
+dotnet run --project AIReviewer/AIReviewer.csproj
+
+# Specify custom settings.ini path
+dotnet run --project AIReviewer/AIReviewer.csproj -- --settings /path/to/settings.ini
+
+# Specify custom .env file path
+dotnet run --project AIReviewer/AIReviewer.csproj -- --env /path/to/.env
+
+# Specify both custom settings and env file
+dotnet run --project AIReviewer/AIReviewer.csproj -- --settings config/prod.ini --env config/.env.prod
+```
+
+**Available Options:**
+- `-s, --settings <path>`: Path to settings.ini file (default: `settings.ini`)
+- `-e, --env <path>`: Path to .env file to load (optional)
+- `-h, --help`: Show help message and exit
+
+**Use Cases:**
+- **Multiple Environments**: Use different settings files for dev/staging/production
+- **Shared Configurations**: Point to a centralized settings file on a network drive
+- **Testing**: Use test-specific settings and environment variables
+- **CI/CD**: Load environment-specific configurations based on build parameters
+
+**Examples:**
+```bash
+# Development environment
+dotnet run -- -s config/dev.ini -e config/.env.dev
+
+# Production environment  
+dotnet run -- -s config/prod.ini -e config/.env.prod
+
+# Testing with custom settings only
+dotnet run -- --settings test-settings.ini
+
+# Load .env from a different directory
+dotnet run -- --env /secure/credentials/.env
+```
+
 ### Running in Azure Pipelines
 
 Add the provided `azure-pipeline.yaml` to your repository and configure the required pipeline variables (see Configuration section below).

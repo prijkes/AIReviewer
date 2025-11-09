@@ -10,22 +10,15 @@ namespace AIReviewer.AI;
 /// Prompt templates are kept in markdown files for easy editing without recompilation.
 /// Supports system, instruction, and language-specific prompts.
 /// </summary>
-public sealed class PromptLoader
+/// <remarks>
+/// Initializes a new instance of the <see cref="PromptLoader"/> class.
+/// </remarks>
+/// <param name="logger">Logger for diagnostic information.</param>
+/// <param name="options">Configuration options for the reviewer.</param>
+public sealed class PromptLoader(ILogger<PromptLoader> logger, IOptionsMonitor<ReviewerOptions> options)
 {
-    private readonly ILogger<PromptLoader> _logger;
-    private readonly ReviewerOptions _options;
+    private readonly ReviewerOptions _options = options.CurrentValue;
     private readonly Dictionary<string, string> _promptCache = new();
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="PromptLoader"/> class.
-    /// </summary>
-    /// <param name="logger">Logger for diagnostic information.</param>
-    /// <param name="options">Configuration options for the reviewer.</param>
-    public PromptLoader(ILogger<PromptLoader> logger, IOptionsMonitor<ReviewerOptions> options)
-    {
-        _logger = logger;
-        _options = options.CurrentValue;
-    }
 
     /// <summary>
     /// Loads the system prompt for a specific programming language.
@@ -101,7 +94,7 @@ public sealed class PromptLoader
         }
 
         var content = await File.ReadAllTextAsync(fullPath, cancellationToken);
-        _logger.LogDebug("Loaded prompt file {PromptPath} (chars: {Length})", fullPath, content.Length);
+        logger.LogDebug("Loaded prompt file {PromptPath} (chars: {Length})", fullPath, content.Length);
         
         _promptCache[path] = content;
         return content;

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AIReviewer": {
+      "commandName": "Project",
+      "commandLineArgs": "--settings E:\\Projects\\AIReviewer\\AIReviewer\\bin\\Debug\\net8.0\\settings.ini --env E:\\Projects\\AIReviewer\\AIReviewer\\bin\\Debug\\net8.0\\.env"
+    }
+  }
+}

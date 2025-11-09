@@ -6,10 +6,9 @@ namespace AIReviewer.Utils;
 /// <summary>
 /// Tracks and logs metrics for code review operations.
 /// </summary>
-public sealed class ReviewMetrics
+public sealed class ReviewMetrics(ILogger<ReviewMetrics> logger)
 {
-    private readonly ILogger<ReviewMetrics> _logger;
-    private readonly Stopwatch _overallStopwatch;
+    private readonly Stopwatch _overallStopwatch = Stopwatch.StartNew();
     private int _totalFilesProcessed;
     private int _totalIssuesFound;
     private int _totalErrors;
@@ -17,12 +16,6 @@ public sealed class ReviewMetrics
     private long _totalInputTokens;
     private long _totalOutputTokens;
     private readonly List<FileReviewMetric> _fileMetrics = [];
-
-    public ReviewMetrics(ILogger<ReviewMetrics> logger)
-    {
-        _logger = logger;
-        _overallStopwatch = Stopwatch.StartNew();
-    }
 
     /// <summary>
     /// Records metrics for a single file review.
@@ -49,7 +42,7 @@ public sealed class ReviewMetrics
 
         _fileMetrics.Add(metric);
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "File review completed - Path: {FilePath}, Issues: {Issues} (E:{Errors}/W:{Warnings}), Tokens: {InputTokens}→{OutputTokens}, Duration: {Duration}ms",
             filePath, issuesFound, errors, warnings, inputTokens, outputTokens, durationMs);
     }
@@ -62,7 +55,7 @@ public sealed class ReviewMetrics
         _totalInputTokens += inputTokens;
         _totalOutputTokens += outputTokens;
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Operation: {Operation}, Tokens: {InputTokens}→{OutputTokens}, Duration: {Duration}ms",
             operation, inputTokens, outputTokens, durationMs);
     }
@@ -78,7 +71,7 @@ public sealed class ReviewMetrics
         var avgDurationPerFile = _totalFilesProcessed > 0 ? totalDuration / _totalFilesProcessed : 0;
         var avgTokensPerFile = _totalFilesProcessed > 0 ? totalTokens / _totalFilesProcessed : 0;
 
-        _logger.LogInformation(
+        logger.LogInformation(
             @"
 === Review Metrics Summary ===
 Total Duration: {TotalDuration}ms
@@ -121,11 +114,11 @@ Cost Estimate (GPT-4):
                 .Take(5)
                 .ToList();
 
-            _logger.LogInformation("Top 5 most expensive files by token usage:");
+            logger.LogInformation("Top 5 most expensive files by token usage:");
             foreach (var metric in topExpensive)
             {
                 var totalFileTokens = metric.InputTokens + metric.OutputTokens;
-                _logger.LogInformation(
+                logger.LogInformation(
                     "  {FilePath}: {TotalTokens:N0} tokens ({InputTokens:N0}→{OutputTokens:N0}), {Issues} issues",
                     metric.FilePath, totalFileTokens, metric.InputTokens, metric.OutputTokens, metric.IssuesFound);
             }
@@ -139,10 +132,10 @@ Cost Estimate (GPT-4):
                 .Take(5)
                 .ToList();
 
-            _logger.LogInformation("Top 5 slowest file reviews:");
+            logger.LogInformation("Top 5 slowest file reviews:");
             foreach (var metric in slowest)
             {
-                _logger.LogInformation(
+                logger.LogInformation(
                     "  {FilePath}: {Duration}ms, {Issues} issues",
                     metric.FilePath, metric.DurationMs, metric.IssuesFound);
             }

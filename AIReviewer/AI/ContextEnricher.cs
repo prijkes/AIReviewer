@@ -8,16 +8,8 @@ namespace AIReviewer.AI;
 /// <summary>
 /// Enriches diffs with additional context to improve AI review quality.
 /// </summary>
-public sealed class ContextEnricher
+public sealed class ContextEnricher(ILogger<ContextEnricher> logger, LocalGitProvider? gitProvider = null)
 {
-    private readonly ILogger<ContextEnricher> _logger;
-    private readonly LocalGitProvider? _gitProvider;
-
-    public ContextEnricher(ILogger<ContextEnricher> logger, LocalGitProvider? gitProvider = null)
-    {
-        _logger = logger;
-        _gitProvider = gitProvider;
-    }
 
     /// <summary>
     /// Enriches a diff with surrounding context from the target branch.
@@ -25,19 +17,19 @@ public sealed class ContextEnricher
     /// </summary>
     public async Task<string> EnrichDiffWithContextAsync(ReviewFileDiff diff, string targetBranch, int contextLines = 5)
     {
-        if (_gitProvider == null)
+        if (gitProvider == null)
         {
-            _logger.LogDebug("Git provider not available, returning original diff");
+            logger.LogDebug("Git provider not available, returning original diff");
             return diff.DiffText;
         }
 
         try
         {
             // Get full file content from target branch
-            var fullContent = await _gitProvider.GetFileContentAsync(diff.Path, targetBranch);
+            var fullContent = await gitProvider.GetFileContentAsync(diff.Path, targetBranch);
             if (fullContent == null)
             {
-                _logger.LogDebug("Could not retrieve full file content for {Path}", diff.Path);
+                logger.LogDebug("Could not retrieve full file content for {Path}", diff.Path);
                 return diff.DiffText;
             }
 
@@ -84,7 +76,7 @@ public sealed class ContextEnricher
             
             if (result.Length > diff.DiffText.Length)
             {
-                _logger.LogDebug("Enriched diff for {Path} (+{ExtraBytes} bytes of context)", 
+                logger.LogDebug("Enriched diff for {Path} (+{ExtraBytes} bytes of context)", 
                     diff.Path, result.Length - diff.DiffText.Length);
             }
 
@@ -92,7 +84,7 @@ public sealed class ContextEnricher
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to enrich diff for {Path}, using original", diff.Path);
+            logger.LogWarning(ex, "Failed to enrich diff for {Path}, using original", diff.Path);
             return diff.DiffText;
         }
     }

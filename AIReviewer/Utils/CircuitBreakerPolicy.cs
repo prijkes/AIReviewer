@@ -7,14 +7,8 @@ namespace AIReviewer.Utils;
 /// <summary>
 /// Provides circuit breaker policies for protecting against cascading failures.
 /// </summary>
-public sealed class CircuitBreakerPolicyFactory
+public sealed class CircuitBreakerPolicyFactory(ILogger<CircuitBreakerPolicyFactory> logger)
 {
-    private readonly ILogger<CircuitBreakerPolicyFactory> _logger;
-
-    public CircuitBreakerPolicyFactory(ILogger<CircuitBreakerPolicyFactory> logger)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// Creates a circuit breaker policy for AI API calls.
@@ -31,18 +25,18 @@ public sealed class CircuitBreakerPolicyFactory
                 BreakDuration = TimeSpan.FromSeconds(30),
                 OnOpened = args =>
                 {
-                    _logger.LogWarning("Circuit breaker opened due to failures. Blocking AI API calls for {Duration}s", 
+                    logger.LogWarning("Circuit breaker opened due to failures. Blocking AI API calls for {Duration}s", 
                         args.BreakDuration.TotalSeconds);
                     return ValueTask.CompletedTask;
                 },
                 OnClosed = args =>
                 {
-                    _logger.LogInformation("Circuit breaker closed. Resuming AI API calls");
+                    logger.LogInformation("Circuit breaker closed. Resuming AI API calls");
                     return ValueTask.CompletedTask;
                 },
                 OnHalfOpened = args =>
                 {
-                    _logger.LogInformation("Circuit breaker half-open. Testing if service has recovered");
+                    logger.LogInformation("Circuit breaker half-open. Testing if service has recovered");
                     return ValueTask.CompletedTask;
                 }
             })
@@ -64,13 +58,13 @@ public sealed class CircuitBreakerPolicyFactory
                 BreakDuration = TimeSpan.FromSeconds(60),
                 OnOpened = args =>
                 {
-                    _logger.LogWarning("Circuit breaker opened for Azure DevOps API. Blocking calls for {Duration}s", 
+                    logger.LogWarning("Circuit breaker opened for Azure DevOps API. Blocking calls for {Duration}s", 
                         args.BreakDuration.TotalSeconds);
                     return ValueTask.CompletedTask;
                 },
                 OnClosed = args =>
                 {
-                    _logger.LogInformation("Circuit breaker closed for Azure DevOps API");
+                    logger.LogInformation("Circuit breaker closed for Azure DevOps API");
                     return ValueTask.CompletedTask;
                 }
             })

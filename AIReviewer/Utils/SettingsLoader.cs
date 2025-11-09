@@ -6,6 +6,7 @@ namespace AIReviewer.Utils;
 
 /// <summary>
 /// Loads and merges configuration from settings.ini and environment variables.
+/// Uses Microsoft.Extensions.Configuration.Binder for automatic type conversion and binding.
 /// </summary>
 public static class SettingsLoader
 {
@@ -43,157 +44,43 @@ public static class SettingsLoader
             throw new InvalidOperationException($"Failed to parse settings.ini: {ex.Message}", ex);
         }
 
-        // Create options and populate from INI
-        var options = new ReviewerOptions
-        {
-            // [AI] section
-            AiFoundryDeployment = GetIniValue(config, "AI", "Deployment", logger),
-            AiTemperature = GetIniDouble(config, "AI", "Temperature", logger),
-            AiMaxTokens = GetIniInt(config, "AI", "MaxTokens", logger),
-
-            // [FunctionCalling] section
-            EnableFunctionCalling = GetIniBool(config, "FunctionCalling", "Enabled", logger),
-            MaxFunctionCalls = GetIniInt(config, "FunctionCalling", "MaxCalls", logger),
-
-            // [Review] section
-            DryRun = GetIniBool(config, "Review", "DryRun", logger),
-            OnlyReviewIfRequiredReviewer = GetIniBool(config, "Review", "OnlyReviewIfRequiredReviewer", logger),
-            ReviewScope = GetIniValue(config, "Review", "Scope", logger),
-            WarnBudget = GetIniInt(config, "Review", "WarnBudget", logger),
-            PolicyPath = GetIniValue(config, "Review", "PolicyPath", logger),
-
-            // [Files] section
-            MaxFilesToReview = GetIniInt(config, "Files", "MaxFilesToReview", logger),
-            MaxIssuesPerFile = GetIniInt(config, "Files", "MaxIssuesPerFile", logger),
-            MaxFileBytes = GetIniSize(config, "Files", "MaxFileBytes", logger),
-            MaxDiffBytes = GetIniSize(config, "Files", "MaxDiffBytes", logger),
-            MaxPromptDiffBytes = GetIniSize(config, "Files", "MaxPromptDiffBytes", logger),
-            MaxCommitMessagesToReview = GetIniInt(config, "Files", "MaxCommitMessagesToReview", logger),
-
-            // [Language] section
-            JapaneseDetectionThreshold = GetIniDouble(config, "Language", "JapaneseDetectionThreshold", logger)
-        };
-
-        logger?.LogInformation("Successfully loaded static settings from {IniPath}", iniPath);
+        // Create options instance
+        var options = new ReviewerOptions();
         
-        // Override with environment variables
-        OverrideFromEnvironment(options, logger);
+        try
+        {
+            // Automatically bind all INI sections to the options object!
+            // This will:
+            // - Bind [AI] section to options.AI
+            // - Bind [FunctionCalling] section to options.FunctionCalling
+            // - Bind [Review] section to options.Review
+            // - Bind [Files] section to options.Files
+            // - Bind [Language] section to options.Language
+            // - Automatically parse all primitive types (int, double, bool, string)
+            // - Automatically use TypeConverter for Size types
+            config.Bind(options);
+            
+            logger?.LogInformation("Successfully loaded static settings from {IniPath}", iniPath);
+            
+            // Log parsed size values for debugging
+            logger?.LogDebug("Parsed Files:MaxFileBytes = {Value} ({Bytes} bytes)", 
+                config["Files:MaxFileBytes"], options.Files.MaxFileBytes.Bytes);
+            logger?.LogDebug("Parsed Files:MaxDiffBytes = {Value} ({Bytes} bytes)", 
+                config["Files:MaxDiffBytes"], options.Files.MaxDiffBytes.Bytes);
+            logger?.LogDebug("Parsed Files:MaxPromptDiffBytes = {Value} ({Bytes} bytes)", 
+                config["Files:MaxPromptDiffBytes"], options.Files.MaxPromptDiffBytes.Bytes);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Failed to bind settings.ini to configuration objects: {ex.Message}\n" +
+                "Ensure all required values are present and in the correct format.", ex);
+        }
         
         // Load required dynamic values from environment
         LoadDynamicFromEnvironment(options, logger);
         
         return options;
-    }
-
-    /// <summary>
-    /// Gets a string value from INI file.
-    /// </summary>
-    private static string GetIniValue(IConfiguration config, string section, string key, ILogger? logger)
-    {
-        var configKey = $"{section}:{key}";
-        var value = config[configKey];
-        
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new InvalidOperationException($"Missing required value in settings.ini: [{section}] {key}");
-        }
-        
-        logger?.LogDebug("Loaded [{Section}] {Key} = {Value}", section, key, value);
-        return value;
-    }
-
-    /// <summary>
-    /// Gets an integer value from INI file.
-    /// </summary>
-    private static int GetIniInt(IConfiguration config, string section, string key, ILogger? logger)
-    {
-        var value = GetIniValue(config, section, key, logger);
-        if (!int.TryParse(value, out var result))
-        {
-            throw new InvalidOperationException($"Invalid integer value in settings.ini: [{section}] {key} = {value}");
-        }
-        return result;
-    }
-
-    /// <summary>
-    /// Gets a double value from INI file.
-    /// </summary>
-    private static double GetIniDouble(IConfiguration config, string section, string key, ILogger? logger)
-    {
-        var value = GetIniValue(config, section, key, logger);
-        if (!double.TryParse(value, out var result))
-        {
-            throw new InvalidOperationException($"Invalid decimal value in settings.ini: [{section}] {key} = {value}");
-        }
-        return result;
-    }
-
-    /// <summary>
-    /// Gets a boolean value from INI file.
-    /// </summary>
-    private static bool GetIniBool(IConfiguration config, string section, string key, ILogger? logger)
-    {
-        var value = GetIniValue(config, section, key, logger);
-        if (!bool.TryParse(value, out var result))
-        {
-            throw new InvalidOperationException($"Invalid boolean value in settings.ini: [{section}] {key} = {value}. Use 'true' or 'false'.");
-        }
-        return result;
-    }
-
-    /// <summary>
-    /// Gets a size value from INI file (supports human-readable formats like "200KB", "1.5GB").
-    /// </summary>
-    private static int GetIniSize(IConfiguration config, string section, string key, ILogger? logger)
-    {
-        var value = GetIniValue(config, section, key, logger);
-        try
-        {
-            var bytes = SizeParser.ParseToBytes(value);
-            logger?.LogDebug("Parsed [{Section}] {Key} = {Value} → {Bytes} bytes ({Formatted})", 
-                section, key, value, bytes, SizeParser.FormatBytes(bytes));
-            return bytes;
-        }
-        catch (FormatException ex)
-        {
-            throw new InvalidOperationException($"Invalid size value in settings.ini: [{section}] {key} = {value}. {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Override INI values with environment variables (if set).
-    /// Pattern: [Section] Key → SECTION_KEY
-    /// </summary>
-    private static void OverrideFromEnvironment(ReviewerOptions options, ILogger? logger)
-    {
-        logger?.LogDebug("Checking for environment variable overrides...");
-        
-        // AI section
-        OverrideIfSet("AI_DEPLOYMENT", v => options.AiFoundryDeployment = v, logger);
-        OverrideIfSet("AI_TEMPERATURE", v => options.AiTemperature = double.Parse(v), logger);
-        OverrideIfSet("AI_MAXTOKENS", v => options.AiMaxTokens = int.Parse(v), logger);
-        
-        // FunctionCalling section
-        OverrideIfSet("FUNCTIONCALLING_ENABLED", v => options.EnableFunctionCalling = bool.Parse(v), logger);
-        OverrideIfSet("FUNCTIONCALLING_MAXCALLS", v => options.MaxFunctionCalls = int.Parse(v), logger);
-        
-        // Review section
-        OverrideIfSet("REVIEW_DRYRUN", v => options.DryRun = bool.Parse(v), logger);
-        OverrideIfSet("REVIEW_ONLYREVIEWIFREQUIREDREVIEWER", v => options.OnlyReviewIfRequiredReviewer = bool.Parse(v), logger);
-        OverrideIfSet("REVIEW_SCOPE", v => options.ReviewScope = v, logger);
-        OverrideIfSet("REVIEW_WARNBUDGET", v => options.WarnBudget = int.Parse(v), logger);
-        OverrideIfSet("REVIEW_POLICYPATH", v => options.PolicyPath = v, logger);
-        
-        // Files section
-        OverrideIfSet("FILES_MAXFILESTOREVIEW", v => options.MaxFilesToReview = int.Parse(v), logger);
-        OverrideIfSet("FILES_MAXISSUESPERFILE", v => options.MaxIssuesPerFile = int.Parse(v), logger);
-        OverrideIfSet("FILES_MAXFILEBYTES", v => options.MaxFileBytes = SizeParser.ParseToBytes(v), logger);
-        OverrideIfSet("FILES_MAXDIFFBYTES", v => options.MaxDiffBytes = SizeParser.ParseToBytes(v), logger);
-        OverrideIfSet("FILES_MAXPROMPTDIFFBYTES", v => options.MaxPromptDiffBytes = SizeParser.ParseToBytes(v), logger);
-        OverrideIfSet("FILES_MAXCOMMITMESSAGESTOREVIEW", v => options.MaxCommitMessagesToReview = int.Parse(v), logger);
-        
-        // Language section
-        OverrideIfSet("LANGUAGE_JAPANESEDETECTIONTHRESHOLD", v => options.JapaneseDetectionThreshold = double.Parse(v), logger);
     }
 
     /// <summary>
@@ -254,25 +141,5 @@ public static class SettingsLoader
         
         logger?.LogDebug("Loaded {VarName} from environment", name);
         return value;
-    }
-
-    /// <summary>
-    /// Override a value if environment variable is set.
-    /// </summary>
-    private static void OverrideIfSet(string envVar, Action<string> setter, ILogger? logger)
-    {
-        var value = Environment.GetEnvironmentVariable(envVar);
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            try
-            {
-                setter(value);
-                logger?.LogInformation("Overridden from environment: {EnvVar} = {Value}", envVar, value);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Invalid value for environment variable {envVar}: {value}", ex);
-            }
-        }
     }
 }
