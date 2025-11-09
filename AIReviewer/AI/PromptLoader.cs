@@ -18,7 +18,7 @@ namespace AIReviewer.AI;
 public sealed class PromptLoader(ILogger<PromptLoader> logger, IOptionsMonitor<ReviewerOptions> options)
 {
     private readonly ReviewerOptions _options = options.CurrentValue;
-    private readonly Dictionary<string, string> _promptCache = new();
+    private readonly Dictionary<string, string> _promptCache = [];
 
     /// <summary>
     /// Loads the system prompt for a specific programming language.

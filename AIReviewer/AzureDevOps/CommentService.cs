@@ -97,23 +97,23 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
         var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
 
         // Create a new thread object with only the fields we want to update
-        // This avoids sending Properties back to Azure DevOps which would cause an error
+        // Only include NEW comments to append, not existing ones (which would have Author fields)
         var updateThread = new GitPullRequestCommentThread
         {
             Status = (thread.Status == CommentThreadStatus.Fixed || thread.Status == CommentThreadStatus.Closed) 
                 ? CommentThreadStatus.Active 
                 : thread.Status,
-            Comments = new List<Comment>(thread.Comments)
-            {
+            Comments =
+            [
                 new Comment
                 {
                     CommentType = CommentType.Text,
                     Content = CommentFormatter.FormatReTriggeredIssue(issue)
                 }
-            }
+            ]
         };
 
-        await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(updateThread, pr.Repository.Id, thread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
+        await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(updateThread, pr.Repository.Id, pr.PullRequest.PullRequestId, thread.Id, cancellationToken: cancellationToken));
         logger.LogInformation("Appended to existing thread {ThreadId}", thread.Id);
     }
 
@@ -144,7 +144,7 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
                 };
                 
                 var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
-                await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(updateThread, pr.Repository.Id, thread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
+                await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(updateThread, pr.Repository.Id, pr.PullRequest.PullRequestId, thread.Id, cancellationToken: cancellationToken));
                 closed.Add(thread.Id);
             }
         }
@@ -193,17 +193,21 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
         }
         else
         {
-            // Create a new thread object with only the Comments field to update
-            // This avoids sending Properties back to Azure DevOps which would cause an error
-            var lastComment = stateThread.Comments[^1];
-            lastComment.Content = content;
-            
-            var updateThread = new GitPullRequestCommentThread
+            // Update the existing comment's content using UpdateCommentAsync
+            // Create a new comment object with only the Content field to avoid Author errors
+            var commentId = stateThread.Comments[^1].Id;
+            var updatedComment = new Comment
             {
-                Comments = new List<Comment> { lastComment }
+                Content = content
             };
             
-            await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(updateThread, pr.Repository.Id, stateThread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
+            await retry.ExecuteAsync(() => adoClient.Git.UpdateCommentAsync(
+                updatedComment, 
+                pr.Repository.Id, 
+                pr.PullRequest.PullRequestId, 
+                stateThread.Id, 
+                commentId, 
+                cancellationToken: cancellationToken));
             logger.LogInformation("Updated state thread for fingerprints");
         }
     }

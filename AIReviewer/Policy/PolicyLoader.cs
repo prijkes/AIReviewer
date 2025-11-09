@@ -18,7 +18,7 @@ namespace AIReviewer.Policy;
 public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<ReviewerOptions> options)
 {
     private readonly ReviewerOptions _options = options.CurrentValue;
-    private readonly Dictionary<string, string> _policyCache = new();
+    private readonly Dictionary<string, string> _policyCache = [];
 
     /// <summary>
     /// Loads a policy file from disk in its original markdown format.
