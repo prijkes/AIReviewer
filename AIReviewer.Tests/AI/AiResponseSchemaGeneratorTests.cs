@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AIReviewer.AI;
 
 namespace AIReviewer.Tests.AI;
@@ -6,10 +7,10 @@ namespace AIReviewer.Tests.AI;
 public class AiResponseSchemaGeneratorTests
 {
     [Fact]
-    public void GetResponseSchema_ShouldIncludeRequiredFields()
+    public void GenerateSchema_ShouldIncludeRequiredFields()
     {
         // Arrange & Act
-        var schema = AiResponseSchemaGenerator.GetResponseSchema();
+        var schema = AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>();
         var schemaJson = schema.ToString();
         var schemaDoc = JsonDocument.Parse(schemaJson);
         
@@ -53,13 +54,64 @@ public class AiResponseSchemaGeneratorTests
     }
     
     [Fact]
-    public void GetResponseSchema_ShouldBeCached()
+    public void GenerateSchema_ShouldBeCached()
     {
         // Arrange & Act
-        var schema1 = AiResponseSchemaGenerator.GetResponseSchema();
-        var schema2 = AiResponseSchemaGenerator.GetResponseSchema();
+        var schema1 = AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>();
+        var schema2 = AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>();
         
         // Assert - Should return the same cached instance
         Assert.Same(schema1, schema2);
     }
+    
+    [Fact]
+    public void GenerateSchema_ShouldWorkWithGenericType()
+    {
+        // Arrange - Create a simple test type
+        var schema = AiResponseSchemaGenerator.GenerateSchema<TestSchema>();
+        var schemaJson = schema.ToString();
+        var schemaDoc = JsonDocument.Parse(schemaJson);
+        
+        // Assert - Should have required fields
+        var required = schemaDoc.RootElement.GetProperty("required");
+        var requiredFields = new HashSet<string>();
+        foreach (var req in required.EnumerateArray())
+        {
+            requiredFields.Add(req.GetString()!);
+        }
+        
+        Assert.Contains("name", requiredFields);
+        Assert.Contains("count", requiredFields);
+    }
+    
+    [Fact]
+    public void GenerateSchema_ShouldCachePerType()
+    {
+        // Arrange & Act
+        var schema1 = AiResponseSchemaGenerator.GenerateSchema<TestSchema>();
+        var schema2 = AiResponseSchemaGenerator.GenerateSchema<TestSchema>();
+        var differentSchema = AiResponseSchemaGenerator.GenerateSchema<AnotherTestSchema>();
+        
+        // Assert - Same type should return same cached instance
+        Assert.Same(schema1, schema2);
+        
+        // Different type should return different instance
+        Assert.NotSame(schema1, differentSchema);
+    }
+    
+    private sealed record TestSchema(
+        [property: JsonPropertyName("name")]
+        [property: JsonRequired]
+        string Name,
+        
+        [property: JsonPropertyName("count")]
+        [property: JsonRequired]
+        int Count
+    );
+    
+    private sealed record AnotherTestSchema(
+        [property: JsonPropertyName("value")]
+        [property: JsonRequired]
+        string Value
+    );
 }

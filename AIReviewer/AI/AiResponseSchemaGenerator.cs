@@ -1,5 +1,5 @@
+using System.Reflection;
 using System.Text.Json.Serialization;
-using AIReviewer.AzureDevOps.Models;
 using NJsonSchema;
 using NJsonSchema.Generation;
 using Namotion.Reflection;
@@ -8,25 +8,33 @@ namespace AIReviewer.AI;
 
 /// <summary>
 /// Generates JSON schemas for AI response models to enable structured outputs.
-/// Schemas are cached for performance.
+/// Schemas are cached per type for performance.
 /// </summary>
 internal static class AiResponseSchemaGenerator
 {
-    private static BinaryData? _cachedSchema;
+    private static readonly Dictionary<Type, BinaryData> _schemaCache = [];
     private static readonly object _lock = new();
 
     /// <summary>
-    /// Gets the JSON schema for AI review responses.
-    /// The schema is generated once and cached for subsequent calls.
+    /// Generates a JSON schema for the specified type.
+    /// The schema is generated once per type and cached for subsequent calls.
+    /// Validates that all properties have the JsonRequired attribute as required by OpenAI.
     /// </summary>
+    /// <typeparam name="T">The type to generate a schema for.</typeparam>
     /// <returns>A BinaryData containing the JSON schema.</returns>
-    public static BinaryData GetResponseSchema()
+    /// <exception cref="InvalidOperationException">Thrown when a property is missing the JsonRequired attribute.</exception>
+    public static BinaryData GenerateSchema<T>() where T : class
     {
-        if (_cachedSchema == null)
+        var type = typeof(T);
+        
+        // Validate that all properties have JsonRequired attribute
+        ValidateAllPropertiesRequired(type);
+        
+        if (!_schemaCache.TryGetValue(type, out var cachedSchema))
         {
             lock (_lock)
             {
-                if (_cachedSchema == null)
+                if (!_schemaCache.TryGetValue(type, out cachedSchema))
                 {
                     var settings = new SystemTextJsonSchemaGeneratorSettings
                     {
@@ -45,7 +53,7 @@ internal static class AiResponseSchemaGenerator
                         }
                     };
 
-                    var schema = JsonSchema.FromType<AiEnvelopeSchema>(settings);
+                    var schema = JsonSchema.FromType<T>(settings);
                     
                     // Configure schema to be strict
                     schema.AllowAdditionalProperties = false;
@@ -54,12 +62,67 @@ internal static class AiResponseSchemaGenerator
                     CleanSchemaForOpenAI(schema);
 
                     string schemaJson = schema.ToJson();
-                    _cachedSchema = BinaryData.FromString(schemaJson);
+                    cachedSchema = BinaryData.FromString(schemaJson);
+                    
+                    _schemaCache[type] = cachedSchema;
                 }
             }
         }
 
-        return _cachedSchema;
+        return cachedSchema;
+    }
+
+    /// <summary>
+    /// Validates that all properties in the type and its nested types have the JsonRequired attribute.
+    /// OpenAI's structured outputs require all properties to be marked as required.
+    /// </summary>
+    private static void ValidateAllPropertiesRequired(Type type)
+    {
+        var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+        
+        foreach (var property in properties)
+        {
+            var hasJsonRequired = property.GetCustomAttribute<JsonRequiredAttribute>() != null;
+            var hasRequiredModifier = property.GetCustomAttribute<System.Runtime.CompilerServices.RequiredMemberAttribute>() != null;
+            
+            if (!hasJsonRequired && !hasRequiredModifier)
+            {
+                throw new InvalidOperationException(
+                    $"Property '{property.Name}' on type '{type.Name}' must have the [JsonRequired] attribute. " +
+                    $"OpenAI's structured outputs require all properties to be marked as required.");
+            }
+            
+            // Recursively validate nested types (but not primitives, enums, or collections)
+            var propertyType = property.PropertyType;
+            
+            // Unwrap nullable types
+            propertyType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
+            
+            // Unwrap collection types
+            if (propertyType.IsGenericType)
+            {
+                var genericDef = propertyType.GetGenericTypeDefinition();
+                if (genericDef == typeof(IReadOnlyList<>) || 
+                    genericDef == typeof(IList<>) || 
+                    genericDef == typeof(List<>) ||
+                    genericDef == typeof(IEnumerable<>) ||
+                    genericDef == typeof(ICollection<>))
+                {
+                    propertyType = propertyType.GetGenericArguments()[0];
+                }
+            }
+            
+            // Only validate custom types (not primitives, enums, or system types)
+            if (propertyType.IsClass && 
+                !propertyType.IsPrimitive && 
+                !propertyType.IsEnum && 
+                propertyType != typeof(string) &&
+                propertyType.Namespace != null &&
+                !propertyType.Namespace.StartsWith("System"))
+            {
+                ValidateAllPropertiesRequired(propertyType);
+            }
+        }
     }
 
     /// <summary>
@@ -150,86 +213,4 @@ internal static class AiResponseSchemaGenerator
             }
         }
     }
-
-    /// <summary>
-    /// Internal schema model that matches the expected AI response structure.
-    /// This is used for schema generation and includes all necessary JSON attributes.
-    /// </summary>
-    private sealed record AiEnvelopeSchema(
-        /// <summary>
-        /// List of code review issues identified by the AI.
-        /// </summary>
-        [property: JsonPropertyName("issues")]
-        [property: JsonRequired]
-        IReadOnlyList<AiIssueSchema> Issues
-    );
-
-    /// <summary>
-    /// Internal schema model representing a single AI-identified issue.
-    /// Uses enum types to ensure structured outputs constrain values correctly.
-    /// </summary>
-    private sealed record AiIssueSchema(
-        /// <summary>
-        /// Unique identifier for the issue (e.g., "PERF-001", "SEC-002").
-        /// </summary>
-        [property: JsonPropertyName("id")]
-        [property: JsonRequired]
-        string Id,
-
-        /// <summary>
-        /// Brief, descriptive title summarizing the issue.
-        /// </summary>
-        [property: JsonPropertyName("title")]
-        [property: JsonRequired]
-        string Title,
-
-        /// <summary>
-        /// Severity level: Info (informational), Warn (should be reviewed), or Error (must be fixed).
-        /// </summary>
-        [property: JsonPropertyName("severity")]
-        [property: JsonRequired]
-        IssueSeverity Severity,
-
-        /// <summary>
-        /// Issue category: Security, Correctness, Style, Performance, Docs, or Tests.
-        /// </summary>
-        [property: JsonPropertyName("category")]
-        [property: JsonRequired]
-        IssueCategory Category,
-
-        /// <summary>
-        /// File path where the issue was found (relative to repository root).
-        /// </summary>
-        [property: JsonPropertyName("file")]
-        [property: JsonRequired]
-        string File,
-
-        /// <summary>
-        /// Line number where the issue occurs (1-based indexing).
-        /// </summary>
-        [property: JsonPropertyName("line")]
-        [property: JsonRequired]
-        int Line,
-
-        /// <summary>
-        /// Detailed explanation of why this is an issue and its potential impact.
-        /// </summary>
-        [property: JsonPropertyName("rationale")]
-        [property: JsonRequired]
-        string Rationale,
-
-        /// <summary>
-        /// Actionable recommendation on how to address or fix the issue.
-        /// </summary>
-        [property: JsonPropertyName("recommendation")]
-        [property: JsonRequired]
-        string Recommendation,
-
-        /// <summary>
-        /// Code example demonstrating the recommended fix; empty if not applicable.
-        /// </summary>
-        [property: JsonPropertyName("fix_example")]
-        [property: JsonRequired]
-        string FixExample
-    );
 }

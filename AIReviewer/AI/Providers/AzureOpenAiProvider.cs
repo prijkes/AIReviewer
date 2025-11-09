@@ -68,7 +68,7 @@ public sealed class AzureOpenAiProvider : IAiProvider
             Temperature = (float)_options.AiTemperature,
             ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
                 jsonSchemaFormatName: "ai_review_response",
-                jsonSchema: AiResponseSchemaGenerator.GetResponseSchema(),
+                jsonSchema: AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>(),
                 jsonSchemaIsStrict: true)
         };
 
@@ -127,7 +127,7 @@ public sealed class AzureOpenAiProvider : IAiProvider
             Temperature = (float)_options.AiTemperature,
             ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
                 jsonSchemaFormatName: "ai_review_response",
-                jsonSchema: AiResponseSchemaGenerator.GetResponseSchema(),
+                jsonSchema: AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>(),
                 jsonSchemaIsStrict: true)
         };
 

@@ -96,20 +96,24 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
     {
         var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
 
-        if (thread.Status == CommentThreadStatus.Fixed || thread.Status == CommentThreadStatus.Closed)
+        // Create a new thread object with only the fields we want to update
+        // This avoids sending Properties back to Azure DevOps which would cause an error
+        var updateThread = new GitPullRequestCommentThread
         {
-            thread.Status = CommentThreadStatus.Active;
-        }
+            Status = (thread.Status == CommentThreadStatus.Fixed || thread.Status == CommentThreadStatus.Closed) 
+                ? CommentThreadStatus.Active 
+                : thread.Status,
+            Comments = new List<Comment>(thread.Comments)
+            {
+                new Comment
+                {
+                    CommentType = CommentType.Text,
+                    Content = CommentFormatter.FormatReTriggeredIssue(issue)
+                }
+            }
+        };
 
-        thread.SetFingerprint(issue.Fingerprint);
-
-        thread.Comments.Add(new Comment
-        {
-            CommentType = CommentType.Text,
-            Content = CommentFormatter.FormatReTriggeredIssue(issue)
-        });
-
-        await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(thread, pr.Repository.Id, thread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
+        await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(updateThread, pr.Repository.Id, thread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
         logger.LogInformation("Appended to existing thread {ThreadId}", thread.Id);
     }
 
@@ -132,9 +136,15 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
             var fingerprint = thread.GetFingerprint();
             if (fingerprint != null && !remainingFingerprints.Contains(fingerprint))
             {
-                thread.Status = CommentThreadStatus.Fixed;
+                // Create a new thread object with only the Status field to update
+                // This avoids sending Properties back to Azure DevOps which would cause an error
+                var updateThread = new GitPullRequestCommentThread
+                {
+                    Status = CommentThreadStatus.Fixed
+                };
+                
                 var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
-                await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(thread, pr.Repository.Id, thread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
+                await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(updateThread, pr.Repository.Id, thread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
                 closed.Add(thread.Id);
             }
         }
@@ -183,8 +193,17 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
         }
         else
         {
-            stateThread.Comments[^1].Content = content;
-            await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(stateThread, pr.Repository.Id, stateThread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
+            // Create a new thread object with only the Comments field to update
+            // This avoids sending Properties back to Azure DevOps which would cause an error
+            var lastComment = stateThread.Comments[^1];
+            lastComment.Content = content;
+            
+            var updateThread = new GitPullRequestCommentThread
+            {
+                Comments = new List<Comment> { lastComment }
+            };
+            
+            await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(updateThread, pr.Repository.Id, stateThread.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
             logger.LogInformation("Updated state thread for fingerprints");
         }
     }
