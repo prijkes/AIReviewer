@@ -36,7 +36,6 @@ public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<R
             return cachedPolicy;
         }
 
-        _options.Normalize();
         var fullPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), path));
         if (!File.Exists(fullPath))
         {
@@ -71,8 +70,6 @@ public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<R
             return cachedPolicy;
         }
 
-        _options.Normalize();
-        
         // Try to load language-specific policy file first
         var languageSpecificPath = GetLanguageSpecificPolicyPath(basePolicyPath, programmingLanguage);
         var fullLanguageSpecificPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), languageSpecificPath));

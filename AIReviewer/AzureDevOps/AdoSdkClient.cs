@@ -38,7 +38,6 @@ public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
     {
         _logger = logger;
         _options = options.CurrentValue;
-        _options.Normalize();
         _retryFactory = retryFactory;
 
         var creds = new VssBasicCredential(string.Empty, _options.AdoAccessToken);

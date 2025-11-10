@@ -85,7 +85,6 @@ public sealed class PromptLoader(ILogger<PromptLoader> logger, IOptionsMonitor<R
             return cachedPrompt;
         }
 
-        _options.Normalize();
         var fullPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), path));
         
         if (!File.Exists(fullPath))
