@@ -57,4 +57,6 @@ public sealed class ReviewIssue
     public string? FixExample { get; init; }
     /// <summary>Unique fingerprint for tracking this issue across PR iterations.</summary>
     public string Fingerprint { get; init; } = string.Empty;
+    /// <summary>Indicates whether this issue is for a deleted file (comments should appear on left side of diff).</summary>
+    public bool IsDeleted { get; init; }
 }

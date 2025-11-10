@@ -18,7 +18,7 @@ public class DiffChunkerTests
     public void ChunkDiff_WithSmallDiff_ShouldReturnSingleChunk()
     {
         // Arrange
-        var diff = new ReviewFileDiff("test.cs", "Small diff content", "hash1", false);
+        var diff = new ReviewFileDiff("test.cs", "Small diff content", "hash1", false, false);
         var maxChunkSize = 1000;
 
         // Act
@@ -38,7 +38,7 @@ public class DiffChunkerTests
     {
         // Arrange
         var largeDiff = string.Join("\n", Enumerable.Range(1, 100).Select(i => $"Line {i}"));
-        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false);
+        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false, false);
         var maxChunkSize = 100; // Small size to force chunking
 
         // Act
@@ -56,7 +56,7 @@ public class DiffChunkerTests
     {
         // Arrange
         var largeDiff = string.Join("\n", Enumerable.Range(1, 50).Select(i => $"Line {i}"));
-        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false);
+        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false, false);
         var maxChunkSize = 50;
 
         // Act
@@ -74,7 +74,7 @@ public class DiffChunkerTests
     {
         // Arrange
         var largeDiff = string.Join("\n", Enumerable.Range(1, 50).Select(i => $"Line {i}"));
-        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false);
+        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false, false);
         var maxChunkSize = 50;
 
         // Act
@@ -90,7 +90,7 @@ public class DiffChunkerTests
     public void DiffChunk_DisplayName_WithSingleChunk_ShouldReturnFilePath()
     {
         // Arrange
-        var diff = new ReviewFileDiff("test.cs", "small content", "hash1", false);
+        var diff = new ReviewFileDiff("test.cs", "small content", "hash1", false, false);
 
         // Act
         var result = _chunker.ChunkDiff(diff, 1000);
@@ -105,7 +105,7 @@ public class DiffChunkerTests
     {
         // Arrange
         var largeDiff = string.Join("\n", Enumerable.Range(1, 50).Select(i => $"Line {i}"));
-        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false);
+        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false, false);
 
         // Act
         var result = _chunker.ChunkDiff(diff, 50);
@@ -130,7 +130,7 @@ public class DiffChunkerTests
  more content
 +another addition
  end";
-        var diff = new ReviewFileDiff("test.cs", diffText, "hash123", false);
+        var diff = new ReviewFileDiff("test.cs", diffText, "hash123", false, false);
 
         // Act
         var result = _chunker.ChunkDiff(diff, 250);
@@ -145,7 +145,7 @@ public class DiffChunkerTests
     public void ChunkDiff_WithEmptyDiff_ShouldReturnSingleChunk()
     {
         // Arrange
-        var diff = new ReviewFileDiff("test.cs", "", "hash1", false);
+        var diff = new ReviewFileDiff("test.cs", "", "hash1", false, false);
         var maxChunkSize = 1000;
 
         // Act
@@ -162,7 +162,7 @@ public class DiffChunkerTests
     {
         // Arrange
         var largeDiff = string.Join("\n", Enumerable.Range(1, 50).Select(i => $"Line {i}"));
-        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false);
+        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false, false);
         var maxChunkSize = 50;
 
         // Act
@@ -185,7 +185,7 @@ public class DiffChunkerTests
         // Arrange - create a diff with content that exceeds max size
         var lines = Enumerable.Range(1, 20).Select(i => $"+Line {i} with some content");
         var largeDiff = string.Join("\n", lines);
-        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false);
+        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash1", false, false);
         var maxChunkSize = 100;
 
         // Act

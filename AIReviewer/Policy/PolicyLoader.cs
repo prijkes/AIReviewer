@@ -15,7 +15,7 @@ namespace AIReviewer.Policy;
 /// </remarks>
 /// <param name="logger">Logger for diagnostic information.</param>
 /// <param name="options">Configuration options for the reviewer.</param>
-public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<ReviewerOptions> options)
+public class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<ReviewerOptions> options)
 {
     private readonly ReviewerOptions _options = options.CurrentValue;
     private readonly Dictionary<string, string> _policyCache = [];
@@ -28,7 +28,7 @@ public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<R
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>The policy content as markdown text.</returns>
     /// <exception cref="FileNotFoundException">Thrown when the policy file doesn't exist.</exception>
-    public async Task<string> LoadAsync(string path, CancellationToken cancellationToken)
+    public virtual async Task<string> LoadAsync(string path, CancellationToken cancellationToken)
     {
         // Return cached policy if available
         if (_policyCache.TryGetValue(path, out var cachedPolicy))
@@ -57,7 +57,7 @@ public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<R
     /// <param name="programmingLanguage">The programming language to load policy for.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>The policy content as markdown text.</returns>
-    public async Task<string> LoadLanguageSpecificAsync(
+    public virtual async Task<string> LoadLanguageSpecificAsync(
         string basePolicyPath,
         ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage,
         CancellationToken cancellationToken)

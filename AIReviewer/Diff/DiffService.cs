@@ -15,7 +15,8 @@ namespace AIReviewer.Diff;
 /// <param name="DiffText">The unified diff text showing changes.</param>
 /// <param name="FileHash">A hash of the file content for fingerprinting.</param>
 /// <param name="IsBinary">Indicates whether this is a binary file.</param>
-public sealed record ReviewFileDiff(string Path, string DiffText, string FileHash, bool IsBinary);
+/// <param name="IsDeleted">Indicates whether this file was deleted in the PR.</param>
+public sealed record ReviewFileDiff(string Path, string DiffText, string FileHash, bool IsBinary, bool IsDeleted);
 
 /// <summary>
 /// Service for retrieving and processing file diffs from Azure DevOps pull request iterations.
@@ -103,7 +104,7 @@ public sealed class DiffService(ILogger<DiffService> logger, IAdoSdkClient adoCl
 
             var fileHash = Logging.HashSha256($"{iterationId}:{path}:{trimmedDiff}");
 
-            diffs.Add(new ReviewFileDiff(path, trimmedDiff, fileHash, false));
+            diffs.Add(new ReviewFileDiff(path, trimmedDiff, fileHash, false, isDeleted));
         }
 
         var totalBytes = diffs.Sum(d => d.DiffText.Length);

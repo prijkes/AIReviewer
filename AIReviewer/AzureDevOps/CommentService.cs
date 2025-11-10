@@ -93,6 +93,8 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
 
     /// <summary>
     /// Creates a new comment thread for an issue that hasn't been reported before.
+    /// For deleted files, positions the comment on the left side of the diff (the original content).
+    /// For added/modified files, positions the comment on the right side of the diff (the new content).
     /// </summary>
     /// <param name="pr">The pull request context.</param>
     /// <param name="issue">The issue to create a thread for.</param>
@@ -106,7 +108,10 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
             ThreadContext = new CommentThreadContext
             {
                 FilePath = issue.FilePath,
-                RightFileStart = issue.Line > 0 ? new CommentPosition { Line = issue.Line } : null
+                // For deleted files, position comment on left side (original content)
+                // For added/modified files, position comment on right side (new content)
+                LeftFileStart = issue.IsDeleted && issue.Line > 0 ? new CommentPosition { Line = issue.Line, Offset = 1 } : null,
+                RightFileStart = !issue.IsDeleted && issue.Line > 0 ? new CommentPosition { Line = issue.Line, Offset = 1 } : null
             },
             Comments =
             [

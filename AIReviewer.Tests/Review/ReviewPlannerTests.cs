@@ -58,6 +58,11 @@ public class ReviewPlannerTests
         _adoClientMock
             .Setup(x => x.GetExistingCommentsAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        
+        // Setup ADO client to return empty comments dictionary
+        _adoClientMock
+            .Setup(x => x.GetExistingCommentsFromThreads(It.IsAny<List<GitPullRequestCommentThread>>()))
+            .Returns(new Dictionary<string, List<ExistingComment>>());
     }
 
     private ReviewPlanner CreatePlanner()
@@ -80,7 +85,7 @@ public class ReviewPlannerTests
         var iteration = new GitPullRequestIteration { Id = 1 };
         var diffs = new List<ReviewFileDiff>
         {
-            new("test.cs", "diff content", "hash1", false)
+            new("test.cs", "diff content", "hash1", false, false)
         };
         var policy = "Test policy";
 
@@ -110,7 +115,7 @@ public class ReviewPlannerTests
         var iteration = new GitPullRequestIteration { Id = 1 };
         var diffs = new List<ReviewFileDiff>
         {
-            new("test.cs", "diff content", "hash1", false)
+            new("test.cs", "diff content", "hash1", false, false)
         };
         var policy = "Test policy";
 
@@ -145,7 +150,7 @@ public class ReviewPlannerTests
         var iteration = new GitPullRequestIteration { Id = 1 };
         var diffs = new List<ReviewFileDiff>
         {
-            new("test.cs", "diff content", "hash1", false)
+            new("test.cs", "diff content", "hash1", false, false)
         };
         var policy = "Test policy";
 
@@ -181,7 +186,7 @@ public class ReviewPlannerTests
         var iteration = new GitPullRequestIteration { Id = 1 };
         var diffs = new List<ReviewFileDiff>
         {
-            new("test.cs", "diff content", "hash1", false)
+            new("test.cs", "diff content", "hash1", false, false)
         };
         var policy = "Test policy";
 
@@ -218,7 +223,7 @@ public class ReviewPlannerTests
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
         var diffs = Enumerable.Range(1, 60)
-            .Select(i => new ReviewFileDiff($"file{i}.cs", "diff", $"hash{i}", false))
+            .Select(i => new ReviewFileDiff($"file{i}.cs", "diff", $"hash{i}", false, false))
             .ToList();
         var policy = "Test policy";
 
@@ -237,6 +242,41 @@ public class ReviewPlannerTests
         _aiClientMock.Verify(
             x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<List<ExistingComment>>(), It.IsAny<CancellationToken>()),
             Times.Exactly(50));
+    }
+
+    [Fact]
+    public async Task PlanAsync_WithDeletedFile_ShouldMarkIssuesAsDeleted()
+    {
+        // Arrange
+        var planner = CreatePlanner();
+        var pr = CreateTestPullRequest();
+        var iteration = new GitPullRequestIteration { Id = 1 };
+        var diffs = new List<ReviewFileDiff>
+        {
+            new("deleted.cs", "diff content", "hash1", false, true) // IsDeleted = true
+        };
+        var policy = "Test policy";
+
+        var issues = new List<AiIssue>
+        {
+            new("W1", "Warning 1", IssueSeverity.Warn, IssueCategory.Style, "deleted.cs", 10, "Rationale", "Fix it", null)
+        };
+
+        _aiClientMock
+            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<List<ExistingComment>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AiReviewResponse(issues));
+
+        _aiClientMock
+            .Setup(x => x.ReviewPullRequestMetadataAsync(It.IsAny<string>(), It.IsAny<PullRequestMetadata>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AiReviewResponse([]));
+
+        // Act
+        var result = await planner.PlanAsync(pr, iteration, diffs, [], policy, CancellationToken.None);
+
+        // Assert
+        result.Issues.Should().HaveCount(1);
+        result.Issues[0].IsDeleted.Should().BeTrue();
+        result.Issues[0].FilePath.Should().Be("deleted.cs");
     }
 
     private static PullRequestContext CreateTestPullRequest()

@@ -94,7 +94,7 @@ public class PromptBuilderTests
     public async Task BuildFileReviewUserPrompt_WithSmallDiff_ShouldIncludeFullDiff()
     {
         // Arrange
-        var diff = new ReviewFileDiff("test.cs", "small diff content", "hash123", false);
+        var diff = new ReviewFileDiff("test.cs", "small diff content", "hash123", false, false);
         var existingComments = new List<ExistingComment>();
 
         // Act
@@ -111,7 +111,7 @@ public class PromptBuilderTests
     {
         // Arrange
         var largeDiff = new string('x', 2000);
-        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash123", false);
+        var diff = new ReviewFileDiff("test.cs", largeDiff, "hash123", false, false);
         var existingComments = new List<ExistingComment>();
 
         // Act

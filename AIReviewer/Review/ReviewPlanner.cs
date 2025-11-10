@@ -176,7 +176,8 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
                     Rationale = issue.Rationale,
                     Recommendation = issue.Recommendation,
                     FixExample = issue.FixExample,
-                    Fingerprint = fingerprint
+                    Fingerprint = fingerprint,
+                    IsDeleted = diff.IsDeleted
                 });
             }
         }
