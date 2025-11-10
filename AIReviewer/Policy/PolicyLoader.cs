@@ -22,6 +22,7 @@ public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<R
 
     /// <summary>
     /// Loads a policy file from disk in its original markdown format.
+    /// The policy is cached to avoid repeated file I/O.
     /// </summary>
     /// <param name="path">The relative path to the policy file.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
@@ -29,6 +30,12 @@ public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<R
     /// <exception cref="FileNotFoundException">Thrown when the policy file doesn't exist.</exception>
     public async Task<string> LoadAsync(string path, CancellationToken cancellationToken)
     {
+        // Return cached policy if available
+        if (_policyCache.TryGetValue(path, out var cachedPolicy))
+        {
+            return cachedPolicy;
+        }
+
         _options.Normalize();
         var fullPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), path));
         if (!File.Exists(fullPath))
@@ -38,6 +45,8 @@ public sealed class PolicyLoader(ILogger<PolicyLoader> logger, IOptionsMonitor<R
 
         var content = await File.ReadAllTextAsync(fullPath, cancellationToken);
         logger.LogInformation("Loaded policy file {PolicyPath} (chars: {Length})", fullPath, content.Length);
+        
+        _policyCache[path] = content;
         return content;
     }
 

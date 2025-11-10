@@ -1,4 +1,5 @@
 ﻿using AIReviewer.AI;
+using AIReviewer.AzureDevOps;
 using AIReviewer.AzureDevOps.Models;
 using AIReviewer.Diff;
 using AIReviewer.Options;
@@ -41,10 +42,11 @@ public sealed record ReviewPlanResult(IReadOnlyList<ReviewIssue> Issues, int Err
 /// </remarks>
 /// <param name="logger">Logger for diagnostic information.</param>
 /// <param name="aiClient">AI client for performing code reviews.</param>
+/// <param name="adoClient">ADO client for retrieving existing PR comments.</param>
 /// <param name="contextRetriever">Context retriever for function calling support.</param>
 /// <param name="policyLoader">Policy loader for loading language-specific policies.</param>
 /// <param name="options">Configuration options for the reviewer.</param>
-public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiClient, ReviewContextRetriever contextRetriever, PolicyLoader policyLoader, IOptionsMonitor<ReviewerOptions> options)
+public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiClient, IAdoSdkClient adoClient, ReviewContextRetriever contextRetriever, PolicyLoader policyLoader, IOptionsMonitor<ReviewerOptions> options)
 {
     private readonly ReviewerOptions _options = options.CurrentValue;
 
@@ -92,7 +94,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
 
         // Review files in parallel
         var reviewTasks = diffsToReview.Select(diff => 
-            ReviewFileAsync(diff, basePolicyPath, language, iteration.Id ?? 0, cancellationToken));
+            ReviewFileAsync(pr, diff, basePolicyPath, language, iteration.Id ?? 0, cancellationToken));
 
         var fileResults = await Task.WhenAll(reviewTasks);
 
@@ -113,8 +115,10 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     /// <summary>
     /// Reviews a single file and returns the identified issues.
     /// Detects the programming language and loads the appropriate policy.
+    /// Retrieves existing comments to provide context and avoid duplicates.
     /// </summary>
     private async Task<List<ReviewIssue>> ReviewFileAsync(
+        PullRequestContext pr,
         ReviewFileDiff diff, 
         string basePolicyPath, 
         string language, 
@@ -136,7 +140,12 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
             // Load language-specific policy
             var policy = await policyLoader.LoadLanguageSpecificAsync(basePolicyPath, programmingLanguage, cancellationToken);
 
-            var aiResponse = await aiClient.ReviewAsync(policy, diff, language, programmingLanguage, cancellationToken);
+            // Retrieve existing comments for this file to provide context and avoid duplicates
+            var existingComments = await adoClient.GetExistingCommentsAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, diff.Path, cancellationToken);
+
+            logger.LogDebug("Found {CommentCount} existing comments on {FilePath}", existingComments.Count, diff.Path);
+
+            var aiResponse = await aiClient.ReviewAsync(policy, diff, language, programmingLanguage, existingComments, cancellationToken);
             
             if (aiResponse.Issues.Count > _options.MaxIssuesPerFile)
             {
@@ -147,6 +156,10 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
             foreach (var issue in aiResponse.Issues.Take(_options.MaxIssuesPerFile))
             {
                 var fingerprint = ComputeFingerprint(diff, iterationId, issue);
+                logger.LogInformation(
+                    "[FINGERPRINT] Generated fingerprint for {FilePath}:{Line} = {Fingerprint} (IterationId={IterationId}, FileHash={FileHash})",
+                    diff.Path, issue.Line, fingerprint, iterationId, diff.FileHash);
+                
                 issues.Add(new ReviewIssue
                 {
                     Id = issue.Id,
@@ -189,7 +202,13 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
         var response = await aiClient.ReviewPullRequestMetadataAsync(policy, metadata, language, cancellationToken);
         return response.Issues.Select(issue =>
         {
+            // NOTE: Metadata reviews still use AI-generated fields (Id, Title) in fingerprint
+            // This may cause duplicates if the AI generates different IDs/titles between runs
             var fingerprint = Logging.HashSha256($"{issue.Id}:{issue.Title}:{iterationId ?? 0}");
+            logger.LogInformation(
+                "[FINGERPRINT-METADATA] Generated fingerprint for metadata issue = {Fingerprint} (Id={Id}, Title={Title}, IterationId={IterationId})",
+                fingerprint, issue.Id, issue.Title, iterationId ?? 0);
+            
             return new ReviewIssue
             {
                 Id = issue.Id,
@@ -207,13 +226,15 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     }
 
     /// <summary>
-    /// Computes a unique fingerprint for an issue based on file path, line, ID, and other attributes.
-    /// This fingerprint is used to track issues across PR iterations.
+    /// Computes a unique fingerprint for an issue based on stable identifiers only.
+    /// Uses file path, line number, iteration ID, and file hash to ensure consistent
+    /// fingerprints across multiple bot runs, preventing duplicate comments.
+    /// AI-generated fields (Id, Title) are excluded as they can vary between runs.
     /// </summary>
     /// <param name="diff">The file diff containing the issue.</param>
     /// <param name="iterationId">The PR iteration ID.</param>
     /// <param name="issue">The AI-identified issue.</param>
     /// <returns>A SHA-256 hash fingerprint string.</returns>
     private static string ComputeFingerprint(ReviewFileDiff diff, int iterationId, AiIssue issue) =>
-        Logging.HashSha256($"{diff.Path}:{issue.Line}:{issue.Id}:{issue.Title}:{iterationId}:{diff.FileHash}");
+        Logging.HashSha256($"{diff.Path}:{issue.Line}:{iterationId}:{diff.FileHash}");
 }

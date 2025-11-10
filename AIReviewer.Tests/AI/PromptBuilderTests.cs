@@ -1,4 +1,5 @@
 using AIReviewer.AI;
+using AIReviewer.AzureDevOps.Models;
 using AIReviewer.Diff;
 using AIReviewer.Options;
 using AIReviewer.Review;
@@ -94,9 +95,10 @@ public class PromptBuilderTests
     {
         // Arrange
         var diff = new ReviewFileDiff("test.cs", "small diff content", "hash123", false);
+        var existingComments = new List<ExistingComment>();
 
         // Act
-        var result = await _promptBuilder.BuildFileReviewUserPromptAsync(diff, CancellationToken.None);
+        var result = await _promptBuilder.BuildFileReviewUserPromptAsync(diff, existingComments, CancellationToken.None);
 
         // Assert
         result.Should().Contain("test.cs");
@@ -110,9 +112,10 @@ public class PromptBuilderTests
         // Arrange
         var largeDiff = new string('x', 2000);
         var diff = new ReviewFileDiff("test.cs", largeDiff, "hash123", false);
+        var existingComments = new List<ExistingComment>();
 
         // Act
-        var result = await _promptBuilder.BuildFileReviewUserPromptAsync(diff, CancellationToken.None);
+        var result = await _promptBuilder.BuildFileReviewUserPromptAsync(diff, existingComments, CancellationToken.None);
 
         // Assert
         result.Should().Contain("test.cs");

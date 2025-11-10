@@ -76,6 +76,23 @@ public sealed class ReviewerHostedService(
                 pr.PullRequest.TargetRefName);
 
             var iteration = pr.LatestIteration;
+            
+            // Check if this iteration has already been reviewed
+            var threads = await adoClient.Git.GetThreadsAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken);
+            var botThreads = threads.Where(t => t.IsCreatedByBot()).ToList();
+            var lastReviewedIteration = await commentService.GetLastReviewedIterationAsync(botThreads);
+            
+            if (lastReviewedIteration.HasValue && lastReviewedIteration.Value == iteration.Id)
+            {
+                logger.LogInformation(
+                    "Skipping review: Iteration {IterationId} has already been reviewed (last reviewed iteration: {LastReviewed})",
+                    iteration.Id, lastReviewedIteration.Value);
+                return;
+            }
+            
+            logger.LogInformation("Reviewing iteration {IterationId} (last reviewed: {LastReviewed})", 
+                iteration.Id, lastReviewedIteration?.ToString() ?? "none");
+            
             var diffs = await diffService.GetDiffsAsync(pr, iteration, cancellationToken);
             
             logger.LogInformation("PR has {CommitCount} commits, {FileCount} files to review", pr.Commits.Length, diffs.Count);

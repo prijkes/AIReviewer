@@ -74,4 +74,15 @@ public interface IAdoSdkClient
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>The unified diff text.</returns>
     Task<string?> GetFileDiffAsync(string filePath, string baseCommit, string targetCommit, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets all existing comments on a pull request for a specific file.
+    /// Used to provide context to AI to avoid duplicate feedback.
+    /// </summary>
+    /// <param name="repoId">The repository ID.</param>
+    /// <param name="prId">The pull request ID.</param>
+    /// <param name="filePath">The file path to get comments for (null for all files).</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>List of existing comments on the file.</returns>
+    Task<List<ExistingComment>> GetExistingCommentsAsync(Guid repoId, int prId, string? filePath, CancellationToken cancellationToken);
 }

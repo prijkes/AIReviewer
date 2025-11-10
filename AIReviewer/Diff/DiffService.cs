@@ -66,12 +66,21 @@ public sealed class DiffService(ILogger<DiffService> logger, IAdoSdkClient adoCl
                 continue;
             }
 
-            // Check if binary based on file type
-            var isBinary = gitItem.GitObjectType != GitObjectType.Blob;
+            // Determine if this is a deletion (GitObjectType.Bad means file doesn't exist in target)
+            var isDeleted = gitItem.GitObjectType == GitObjectType.Bad;
+            
+            // Check if binary based on file type (but allow deletions through)
+            // For deleted files, we can't check the blob, so we'll let the diff tell us if it's binary
+            var isBinary = !isDeleted && gitItem.GitObjectType != GitObjectType.Blob;
             if (isBinary)
             {
                 logger.LogInformation("Skipping non-blob file {Path}", path);
                 continue;
+            }
+
+            if (isDeleted)
+            {
+                logger.LogDebug("Processing deleted file {Path}", path);
             }
 
             // Generate the actual diff using git

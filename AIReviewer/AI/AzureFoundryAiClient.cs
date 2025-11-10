@@ -53,10 +53,10 @@ public sealed class AzureFoundryAiClient : IAiClient
     }
 
     /// <inheritdoc/>
-    public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage, CancellationToken cancellationToken)
+    public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage, List<AzureDevOps.Models.ExistingComment> existingComments, CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Requesting AI review for {Path} ({DiffSize} bytes) in language: {Language}, programming language: {ProgrammingLanguage}",
-            fileDiff.Path, fileDiff.DiffText.Length, language, ProgrammingLanguageDetector.GetDisplayName(programmingLanguage));
+        _logger.LogDebug("Requesting AI review for {Path} ({DiffSize} bytes, {CommentCount} existing comments) in language: {Language}, programming language: {ProgrammingLanguage}",
+            fileDiff.Path, fileDiff.DiffText.Length, existingComments.Count, language, ProgrammingLanguageDetector.GetDisplayName(programmingLanguage));
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
@@ -64,7 +64,7 @@ public sealed class AzureFoundryAiClient : IAiClient
         var chatClient = _client.GetChatClient(_options.AiFoundryDeployment);
         
         var systemPrompt = await _promptBuilder.BuildFileReviewSystemPromptAsync(policy, language, programmingLanguage, cancellationToken);
-        var userPrompt = await _promptBuilder.BuildFileReviewUserPromptAsync(fileDiff, cancellationToken);
+        var userPrompt = await _promptBuilder.BuildFileReviewUserPromptAsync(fileDiff, existingComments, cancellationToken);
         
         var messages = new List<ChatMessage>
         {
@@ -74,8 +74,6 @@ public sealed class AzureFoundryAiClient : IAiClient
 
         var options = new ChatCompletionOptions
         {
-            MaxOutputTokenCount = _options.AiMaxTokens,
-            Temperature = (float)_options.AiTemperature,
             ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
                 jsonSchemaFormatName: "ai_review_response",
                 jsonSchema: AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>(),

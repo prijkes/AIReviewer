@@ -43,9 +43,13 @@ public sealed class PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor
     /// Builds a user prompt for reviewing a file diff.
     /// </summary>
     /// <param name="fileDiff">The file diff to review.</param>
+    /// <param name="existingComments">Existing comments on this file from other reviewers.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>The formatted user prompt.</returns>
-    public async Task<string> BuildFileReviewUserPromptAsync(ReviewFileDiff fileDiff, CancellationToken cancellationToken)
+    public async Task<string> BuildFileReviewUserPromptAsync(
+        ReviewFileDiff fileDiff, 
+        List<AzureDevOps.Models.ExistingComment> existingComments,
+        CancellationToken cancellationToken)
     {
         var truncatedDiff = fileDiff.DiffText;
         if (fileDiff.DiffText.Length > _options.MaxPromptDiffBytes)
@@ -57,13 +61,41 @@ public sealed class PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor
 
         var instructions = await promptLoader.LoadFileReviewInstructionAsync(cancellationToken);
 
+        // Build existing comments section if there are any
+        var commentsSection = existingComments.Count > 0 
+            ? FormatExistingComments(existingComments) 
+            : string.Empty;
+
         return $"""
             File: {fileDiff.Path}
             Unified Diff:
             {truncatedDiff}
-
+            {commentsSection}
             {instructions}
             """;
+    }
+
+    /// <summary>
+    /// Formats existing comments for inclusion in the AI prompt.
+    /// </summary>
+    private static string FormatExistingComments(List<AzureDevOps.Models.ExistingComment> comments)
+    {
+        if (comments.Count == 0)
+            return string.Empty;
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine();
+        sb.AppendLine("Existing Comments on this file:");
+        sb.AppendLine("⚠️ IMPORTANT: Do NOT create issues that duplicate or overlap with these existing comments. Focus only on NEW issues not already mentioned.");
+        sb.AppendLine();
+
+        foreach (var comment in comments.OrderBy(c => c.LineNumber ?? int.MaxValue))
+        {
+            var lineInfo = comment.LineNumber.HasValue ? $" (Line {comment.LineNumber})" : "";
+            sb.AppendLine($"- [{comment.Author}]{lineInfo}: {comment.Content}");
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>

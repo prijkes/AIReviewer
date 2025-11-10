@@ -23,6 +23,15 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
     }
 
     /// <summary>
+    /// Gets the current pull request context.
+    /// </summary>
+    /// <returns>The current PR context, or null if not set.</returns>
+    public PullRequestContext? GetPullRequestContext()
+    {
+        return _currentPrContext;
+    }
+
+    /// <summary>
     /// Gets the full content of a file from the target branch (where PR is merging to).
     /// Useful for understanding the complete context of changes.
     /// </summary>

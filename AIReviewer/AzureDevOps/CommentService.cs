@@ -19,6 +19,32 @@ namespace AIReviewer.AzureDevOps;
 public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient adoClient, RetryPolicyFactory retryPolicy)
 {
     /// <summary>
+    /// Gets the last reviewed iteration ID from existing bot threads.
+    /// </summary>
+    /// <param name="botThreads">The bot-created threads to analyze.</param>
+    /// <returns>The highest iteration ID found, or null if no threads exist.</returns>
+    public Task<int?> GetLastReviewedIterationAsync(List<GitPullRequestCommentThread> botThreads)
+    {
+        if (botThreads.Count == 0)
+            return Task.FromResult<int?>(null);
+
+        // Extract iteration IDs from thread properties
+        var iterationIds = botThreads
+            .Select(t => t.GetIterationId())
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .ToList();
+
+        if (iterationIds.Count == 0)
+            return Task.FromResult<int?>(null);
+
+        var maxIteration = iterationIds.Max();
+        logger.LogDebug("Last reviewed iteration: {IterationId} (from {ThreadCount} threads)", maxIteration, iterationIds.Count);
+        
+        return Task.FromResult<int?>(maxIteration);
+    }
+
+    /// <summary>
     /// Applies the review results by creating, updating, or resolving comment threads on the pull request.
     /// </summary>
     /// <param name="pr">The pull request context.</param>
@@ -29,18 +55,38 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
     public async Task ApplyReviewAsync(PullRequestContext pr, GitPullRequestIteration iteration, ReviewPlanResult result, CancellationToken cancellationToken)
     {
         var threads = await adoClient.Git.GetThreadsAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken);
-        var botThreads = threads.Where(t => t.IsBot()).ToList();
+        var botThreads = threads.Where(t => t.IsCreatedByBot()).ToList();
+
+        logger.LogInformation("[THREAD-MATCHING] Retrieved {TotalThreads} total threads, {BotThreads} are bot threads", 
+            threads.Count, botThreads.Count);
+
+        // Log all existing bot thread fingerprints
+        foreach (var thread in botThreads)
+        {
+            var fp = thread.GetFingerprint();
+            logger.LogInformation("[THREAD-MATCHING] Existing thread {ThreadId}: fingerprint={Fingerprint}, status={Status}", 
+                thread.Id, fp ?? "NULL", thread.Status);
+        }
+
+        var iterationId = iteration.Id ?? throw new InvalidOperationException("Iteration ID is required");
 
         foreach (var issue in result.Issues)
         {
+            logger.LogInformation("[THREAD-MATCHING] Processing issue with fingerprint={Fingerprint} for {FilePath}:{Line}", 
+                issue.Fingerprint, issue.FilePath, issue.Line);
+            
             var existing = botThreads.FirstOrDefault(t => t.GetFingerprint() == issue.Fingerprint);
             if (existing != null)
             {
+                logger.LogInformation("[THREAD-MATCHING] MATCHED existing thread {ThreadId} for issue {Fingerprint}", 
+                    existing.Id, issue.Fingerprint);
                 await AppendToExistingThreadAsync(pr, existing, issue, cancellationToken);
             }
             else
             {
-                await CreateThreadAsync(pr, issue, cancellationToken);
+                logger.LogInformation("[THREAD-MATCHING] NO MATCH found, creating new thread for issue {Fingerprint}", 
+                    issue.Fingerprint);
+                await CreateThreadAsync(pr, issue, iterationId, cancellationToken);
             }
         }
 
@@ -53,9 +99,10 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
     /// </summary>
     /// <param name="pr">The pull request context.</param>
     /// <param name="issue">The issue to create a thread for.</param>
+    /// <param name="iterationId">The iteration ID when this issue was found.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    private async Task CreateThreadAsync(PullRequestContext pr, ReviewIssue issue, CancellationToken cancellationToken)
+    private async Task CreateThreadAsync(PullRequestContext pr, ReviewIssue issue, int iterationId, CancellationToken cancellationToken)
     {
         var thread = new GitPullRequestCommentThread
         {
@@ -77,10 +124,11 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
 
         thread.MarkAsBot();
         thread.SetFingerprint(issue.Fingerprint);
+        thread.SetIterationId(iterationId);
 
         var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
         await retry.ExecuteAsync(() => adoClient.Git.CreateThreadAsync(thread, pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken));
-        logger.LogInformation("Created new comment thread for issue {FingerPrint}", issue.Fingerprint);
+        logger.LogInformation("Created new comment thread for issue {FingerPrint} at iteration {IterationId}", issue.Fingerprint, iterationId);
     }
 
     /// <summary>

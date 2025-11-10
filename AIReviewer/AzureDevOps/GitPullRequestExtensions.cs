@@ -13,6 +13,9 @@ public static class GitPullRequestExtensions
     /// <summary>Property key to store issue fingerprints for tracking across iterations.</summary>
     private const string FingerprintProperty = "fingerprint";
     
+    /// <summary>Property key to store the iteration ID when the thread was created.</summary>
+    private const string IterationIdProperty = "iteration-id";
+    
     /// <summary>Identifier for the special state tracking thread.</summary>
     private const string StateThreadIdentifier = "ai-state";
 
@@ -21,7 +24,7 @@ public static class GitPullRequestExtensions
     /// </summary>
     /// <param name="thread">The comment thread to check.</param>
     /// <returns>True if the thread was created by the bot; otherwise false.</returns>
-    public static bool IsBot(this GitPullRequestCommentThread thread)
+    public static bool IsCreatedByBot(this GitPullRequestCommentThread thread)
     {
         return thread.Properties?.ContainsKey(BotProperty) == true;
     }
@@ -78,5 +81,33 @@ public static class GitPullRequestExtensions
         thread.Properties ??= [];
         thread.Properties[BotProperty] = true;
         thread.Properties[StateThreadIdentifier] = true;
+    }
+
+    /// <summary>
+    /// Gets the iteration ID from a comment thread.
+    /// </summary>
+    /// <param name="thread">The comment thread to get the iteration ID from.</param>
+    /// <returns>The iteration ID if it exists; otherwise null.</returns>
+    public static int? GetIterationId(this GitPullRequestCommentThread thread)
+    {
+        if (thread.Properties?.TryGetValue(IterationIdProperty, out var iterationId) == true)
+        {
+            if (iterationId is int intValue)
+                return intValue;
+            if (int.TryParse(iterationId.ToString(), out var parsedValue))
+                return parsedValue;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Sets the iteration ID on a comment thread.
+    /// </summary>
+    /// <param name="thread">The comment thread to set the iteration ID on.</param>
+    /// <param name="iterationId">The iteration ID to set.</param>
+    public static void SetIterationId(this GitPullRequestCommentThread thread, int iterationId)
+    {
+        thread.Properties ??= [];
+        thread.Properties[IterationIdProperty] = iterationId;
     }
 }

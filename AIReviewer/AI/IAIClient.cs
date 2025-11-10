@@ -17,9 +17,10 @@ public interface IAiClient
     /// <param name="fileDiff">The file diff to review.</param>
     /// <param name="language">The language code for the review response ("en" for English, "ja" for Japanese).</param>
     /// <param name="programmingLanguage">The programming language of the file being reviewed.</param>
+    /// <param name="existingComments">Existing comments on this file from other reviewers to avoid duplicates.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A response containing the list of issues found.</returns>
-    Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage, CancellationToken cancellationToken);
+    Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage, List<ExistingComment> existingComments, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reviews pull request metadata (title, description, commits) for hygiene and completeness.

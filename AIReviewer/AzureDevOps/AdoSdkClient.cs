@@ -269,6 +269,92 @@ public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
     }
 
     /// <summary>
+    /// Gets all existing comments on a pull request for a specific file.
+    /// Used to provide context to AI to avoid duplicate feedback.
+    /// </summary>
+    /// <param name="repoId">The repository ID.</param>
+    /// <param name="prId">The pull request ID.</param>
+    /// <param name="filePath">The file path to get comments for (null for all files).</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>List of existing comments on the file.</returns>
+    public async Task<List<ExistingComment>> GetExistingCommentsAsync(
+        Guid repoId,
+        int prId,
+        string? filePath,
+        CancellationToken cancellationToken)
+    {
+        var retry = _retryFactory.CreateHttpRetryPolicy(nameof(GitHttpClient));
+        
+        var threads = await retry.ExecuteAsync(() => 
+            _gitClient.GetThreadsAsync(repoId, prId, cancellationToken: cancellationToken));
+
+        var existingComments = new List<ExistingComment>();
+        var botIdentity = GetAuthorizedIdentity();
+
+        foreach (var thread in threads)
+        {
+            // Skip if this is a bot's own thread (we're looking for external feedback)
+            if (thread.IsCreatedByBot())
+            {
+                continue;
+            }
+
+            // Filter by file path if specified
+            var threadFilePath = thread.ThreadContext?.FilePath;
+            if (filePath != null && threadFilePath != filePath)
+            {
+                continue;
+            }
+
+            // Skip threads with no file context (PR-level comments)
+            if (string.IsNullOrWhiteSpace(threadFilePath))
+            {
+                continue;
+            }
+
+            // Get the line number if available
+            int? lineNumber = thread.ThreadContext?.RightFileStart?.Line;
+
+            // Extract comments from the thread
+            foreach (var comment in thread.Comments ?? [])
+            {
+                // Skip system comments
+                if (comment.CommentType != Microsoft.TeamFoundation.SourceControl.WebApi.CommentType.Text)
+                {
+                    continue;
+                }
+
+                // Skip empty comments
+                if (string.IsNullOrWhiteSpace(comment.Content))
+                {
+                    continue;
+                }
+
+                var author = comment.Author?.DisplayName ?? "Unknown";
+                
+                // Skip bot's own comments (in case thread wasn't marked)
+                if (comment.Author?.Id == botIdentity.Id)
+                {
+                    continue;
+                }
+
+                existingComments.Add(new ExistingComment(
+                    Author: author,
+                    Content: comment.Content,
+                    FilePath: threadFilePath,
+                    LineNumber: lineNumber,
+                    ThreadStatus: thread.Status.ToString()
+                ));
+            }
+        }
+
+        _logger.LogDebug("Retrieved {Count} existing comments for file: {FilePath}", 
+            existingComments.Count, filePath ?? "all files");
+
+        return existingComments;
+    }
+
+    /// <summary>
     /// Disposes the ADO client and disconnects the VSS connection.
     /// </summary>
     public void Dispose()

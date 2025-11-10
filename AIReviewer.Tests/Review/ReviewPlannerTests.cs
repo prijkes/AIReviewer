@@ -1,4 +1,5 @@
 using AIReviewer.AI;
+using AIReviewer.AzureDevOps;
 using AIReviewer.AzureDevOps.Models;
 using AIReviewer.Diff;
 using AIReviewer.Options;
@@ -15,6 +16,8 @@ public class ReviewPlannerTests
 {
     private readonly Mock<ILogger<ReviewPlanner>> _loggerMock;
     private readonly Mock<IAiClient> _aiClientMock;
+    private readonly Mock<IAdoSdkClient> _adoClientMock;
+    private readonly Mock<ReviewContextRetriever> _contextRetrieverMock;
     private readonly Mock<PolicyLoader> _policyLoaderMock;
     private readonly Mock<IOptionsMonitor<ReviewerOptions>> _optionsMock;
     private readonly ReviewerOptions _options;
@@ -23,6 +26,10 @@ public class ReviewPlannerTests
     {
         _loggerMock = new Mock<ILogger<ReviewPlanner>>();
         _aiClientMock = new Mock<IAiClient>();
+        _adoClientMock = new Mock<IAdoSdkClient>();
+        _contextRetrieverMock = new Mock<ReviewContextRetriever>(
+            Mock.Of<ILogger<ReviewContextRetriever>>(),
+            Mock.Of<IAdoSdkClient>());
         _policyLoaderMock = new Mock<PolicyLoader>(
             Mock.Of<ILogger<PolicyLoader>>(),
             Mock.Of<IOptionsMonitor<ReviewerOptions>>());
@@ -46,15 +53,20 @@ public class ReviewPlannerTests
         _policyLoaderMock
             .Setup(x => x.LoadLanguageSpecificAsync(It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("Test policy");
+        
+        // Setup ADO client to return empty comments list
+        _adoClientMock
+            .Setup(x => x.GetExistingCommentsAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
 
     private ReviewPlanner CreatePlanner()
     {
-        // Create a null context retriever for testing since we don't use function calling in these tests
         return new ReviewPlanner(
             _loggerMock.Object,
             _aiClientMock.Object,
-            null!,  // Context retriever not needed for these tests
+            _adoClientMock.Object,
+            _contextRetrieverMock.Object,
             _policyLoaderMock.Object,
             _optionsMock.Object);
     }
@@ -73,7 +85,7 @@ public class ReviewPlannerTests
         var policy = "Test policy";
 
         _aiClientMock
-            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<List<ExistingComment>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AiReviewResponse([]));
 
         _aiClientMock
@@ -108,7 +120,7 @@ public class ReviewPlannerTests
         };
 
         _aiClientMock
-            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<List<ExistingComment>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AiReviewResponse(issues));
 
         _aiClientMock
@@ -144,7 +156,7 @@ public class ReviewPlannerTests
         };
 
         _aiClientMock
-            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<List<ExistingComment>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AiReviewResponse(issues));
 
         _aiClientMock
@@ -182,7 +194,7 @@ public class ReviewPlannerTests
         };
 
         _aiClientMock
-            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<List<ExistingComment>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AiReviewResponse(issues));
 
         _aiClientMock
@@ -211,7 +223,7 @@ public class ReviewPlannerTests
         var policy = "Test policy";
 
         _aiClientMock
-            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<List<ExistingComment>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AiReviewResponse([]));
 
         _aiClientMock
@@ -223,7 +235,7 @@ public class ReviewPlannerTests
 
         // Assert - Should only review MaxFilesToReview (50) files
         _aiClientMock.Verify(
-            x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()),
+            x => x.ReviewAsync(It.IsAny<string>(), It.IsAny<ReviewFileDiff>(), It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<List<ExistingComment>>(), It.IsAny<CancellationToken>()),
             Times.Exactly(50));
     }
 
