@@ -75,7 +75,7 @@ internal static class Program
                 services.AddSingleton(sp =>
                 {
                     var logger = sp.GetService<ILogger<ReviewerOptions>>();
-                    
+
                     // Load .env file if specified (before loading settings)
                     if (envPath != null)
                     {
@@ -96,19 +96,19 @@ internal static class Program
                             logger?.LogWarning("No environment variables found in {EnvFile}", envPath);
                         }
                     }
-                    
+
                     // Load settings from settings.ini + environment
                     var options = SettingsLoader.Load(logger, settingsPath);
-                    
+
                     // Normalize paths
                     options.Normalize();
-                    
+
                     return MsOptions.Options.Create(options);
                 });
-                
+
                 // Register as singleton for direct access
                 services.AddSingleton(sp => sp.GetRequiredService<MsOptions.IOptions<ReviewerOptions>>().Value);
-                
+
                 // Register as IOptionsMonitor for components that need it
                 services.AddSingleton<MsOptions.IOptionsMonitor<ReviewerOptions>>(sp =>
                 {

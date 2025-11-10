@@ -40,7 +40,7 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
 
         var maxIteration = iterationIds.Max();
         logger.LogDebug("Last reviewed iteration: {IterationId} (from {ThreadCount} threads)", maxIteration, iterationIds.Count);
-        
+
         return Task.FromResult<int?>(maxIteration);
     }
 
@@ -50,21 +50,18 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
     /// <param name="pr">The pull request context.</param>
     /// <param name="iteration">The current PR iteration.</param>
     /// <param name="result">The review results containing identified issues.</param>
+    /// <param name="botThreads">Pre-fetched bot-created threads to avoid re-fetching.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    public async Task ApplyReviewAsync(PullRequestContext pr, GitPullRequestIteration iteration, ReviewPlanResult result, CancellationToken cancellationToken)
+    public async Task ApplyReviewAsync(PullRequestContext pr, GitPullRequestIteration iteration, ReviewPlanResult result, List<GitPullRequestCommentThread> botThreads, CancellationToken cancellationToken)
     {
-        var threads = await adoClient.Git.GetThreadsAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken);
-        var botThreads = threads.Where(t => t.IsCreatedByBot()).ToList();
-
-        logger.LogInformation("[THREAD-MATCHING] Retrieved {TotalThreads} total threads, {BotThreads} are bot threads", 
-            threads.Count, botThreads.Count);
+        logger.LogInformation("[THREAD-MATCHING] Using {BotThreads} pre-fetched bot threads", botThreads.Count);
 
         // Log all existing bot thread fingerprints
         foreach (var thread in botThreads)
         {
             var fp = thread.GetFingerprint();
-            logger.LogInformation("[THREAD-MATCHING] Existing thread {ThreadId}: fingerprint={Fingerprint}, status={Status}", 
+            logger.LogInformation("[THREAD-MATCHING] Existing thread {ThreadId}: fingerprint={Fingerprint}, status={Status}",
                 thread.Id, fp ?? "NULL", thread.Status);
         }
 
@@ -72,19 +69,19 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
 
         foreach (var issue in result.Issues)
         {
-            logger.LogInformation("[THREAD-MATCHING] Processing issue with fingerprint={Fingerprint} for {FilePath}:{Line}", 
+            logger.LogInformation("[THREAD-MATCHING] Processing issue with fingerprint={Fingerprint} for {FilePath}:{Line}",
                 issue.Fingerprint, issue.FilePath, issue.Line);
-            
+
             var existing = botThreads.FirstOrDefault(t => t.GetFingerprint() == issue.Fingerprint);
             if (existing != null)
             {
-                logger.LogInformation("[THREAD-MATCHING] MATCHED existing thread {ThreadId} for issue {Fingerprint}", 
+                logger.LogInformation("[THREAD-MATCHING] MATCHED existing thread {ThreadId} for issue {Fingerprint}",
                     existing.Id, issue.Fingerprint);
                 await AppendToExistingThreadAsync(pr, existing, issue, cancellationToken);
             }
             else
             {
-                logger.LogInformation("[THREAD-MATCHING] NO MATCH found, creating new thread for issue {Fingerprint}", 
+                logger.LogInformation("[THREAD-MATCHING] NO MATCH found, creating new thread for issue {Fingerprint}",
                     issue.Fingerprint);
                 await CreateThreadAsync(pr, issue, iterationId, cancellationToken);
             }
@@ -148,8 +145,8 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
         // Only include NEW comments to append, not existing ones (which would have Author fields)
         var updateThread = new GitPullRequestCommentThread
         {
-            Status = (thread.Status == CommentThreadStatus.Fixed || thread.Status == CommentThreadStatus.Closed) 
-                ? CommentThreadStatus.Active 
+            Status = (thread.Status == CommentThreadStatus.Fixed || thread.Status == CommentThreadStatus.Closed)
+                ? CommentThreadStatus.Active
                 : thread.Status,
             Comments =
             [
@@ -190,7 +187,7 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
                 {
                     Status = CommentThreadStatus.Fixed
                 };
-                
+
                 var retry = retryPolicy.CreateHttpRetryPolicy(nameof(GitHttpClient));
                 await retry.ExecuteAsync(() => adoClient.Git.UpdateThreadAsync(updateThread, pr.Repository.Id, pr.PullRequest.PullRequestId, thread.Id, cancellationToken: cancellationToken));
                 closed.Add(thread.Id);
@@ -248,13 +245,13 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
             {
                 Content = content
             };
-            
+
             await retry.ExecuteAsync(() => adoClient.Git.UpdateCommentAsync(
-                updatedComment, 
-                pr.Repository.Id, 
-                pr.PullRequest.PullRequestId, 
-                stateThread.Id, 
-                commentId, 
+                updatedComment,
+                pr.Repository.Id,
+                pr.PullRequest.PullRequestId,
+                stateThread.Id,
+                commentId,
                 cancellationToken: cancellationToken));
             logger.LogInformation("Updated state thread for fingerprints");
         }

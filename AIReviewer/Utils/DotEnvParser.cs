@@ -28,7 +28,7 @@ public static class DotEnvParser
             }
 
             var line = rawLine.Trim();
-            
+
             // Skip comments
             if (line.StartsWith('#'))
             {

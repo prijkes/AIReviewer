@@ -28,8 +28,8 @@ public sealed class PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>The complete system prompt.</returns>
     public async Task<string> BuildFileReviewSystemPromptAsync(
-        string policy, 
-        string language, 
+        string policy,
+        string language,
         ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage,
         CancellationToken cancellationToken)
     {
@@ -47,7 +47,7 @@ public sealed class PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>The formatted user prompt.</returns>
     public async Task<string> BuildFileReviewUserPromptAsync(
-        ReviewFileDiff fileDiff, 
+        ReviewFileDiff fileDiff,
         List<AzureDevOps.Models.ExistingComment> existingComments,
         CancellationToken cancellationToken)
     {
@@ -62,8 +62,8 @@ public sealed class PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor
         var instructions = await promptLoader.LoadFileReviewInstructionAsync(cancellationToken);
 
         // Build existing comments section if there are any
-        var commentsSection = existingComments.Count > 0 
-            ? FormatExistingComments(existingComments) 
+        var commentsSection = existingComments.Count > 0
+            ? FormatExistingComments(existingComments)
             : string.Empty;
 
         return $"""

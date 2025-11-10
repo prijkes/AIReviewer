@@ -44,7 +44,7 @@ public class ReviewerOptionsValidatorTests
     {
         // Arrange
         var options = CreateValidOptions();
-        
+
         // Create a temporary policy file for the test
         var policyPath = Path.Combine(AppContext.BaseDirectory, "policy.md");
         File.WriteAllText(policyPath, "# Test Policy");
@@ -382,7 +382,7 @@ public class ReviewerOptionsValidatorTests
     {
         // Arrange
         var options = CreateValidOptions();
-        
+
         // Create a temporary policy file for the test
         var policyPath = Path.Combine(AppContext.BaseDirectory, "policy.md");
         File.WriteAllText(policyPath, "# Test Policy");

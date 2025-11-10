@@ -34,9 +34,9 @@ public sealed class AzureFoundryAiClient : IAiClient
     /// <param name="contextRetriever">Context retriever for function calling.</param>
     /// <param name="promptBuilder">Prompt builder for constructing review prompts.</param>
     public AzureFoundryAiClient(
-        ILogger<AzureFoundryAiClient> logger, 
-        IOptionsMonitor<ReviewerOptions> options, 
-        RetryPolicyFactory retryFactory, 
+        ILogger<AzureFoundryAiClient> logger,
+        IOptionsMonitor<ReviewerOptions> options,
+        RetryPolicyFactory retryFactory,
         ReviewContextRetriever contextRetriever,
         PromptBuilder promptBuilder)
     {
@@ -45,7 +45,7 @@ public sealed class AzureFoundryAiClient : IAiClient
         _retryFactory = retryFactory;
         _contextRetriever = contextRetriever;
         _promptBuilder = promptBuilder;
-        
+
         _client = new AzureOpenAIClient(
             new Uri(_options.AiFoundryEndpoint),
             new ApiKeyCredential(_options.AiFoundryApiKey)
@@ -59,13 +59,13 @@ public sealed class AzureFoundryAiClient : IAiClient
             fileDiff.Path, fileDiff.DiffText.Length, existingComments.Count, language, ProgrammingLanguageDetector.GetDisplayName(programmingLanguage));
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
+
         // Use ChatClient for structured outputs support
         var chatClient = _client.GetChatClient(_options.AiFoundryDeployment);
-        
+
         var systemPrompt = await _promptBuilder.BuildFileReviewSystemPromptAsync(policy, language, programmingLanguage, cancellationToken);
         var userPrompt = await _promptBuilder.BuildFileReviewUserPromptAsync(fileDiff, existingComments, cancellationToken);
-        
+
         var messages = new List<ChatMessage>
         {
             new SystemChatMessage(systemPrompt),
@@ -90,7 +90,7 @@ public sealed class AzureFoundryAiClient : IAiClient
         }
 
         var completion = await chatClient.CompleteChatAsync(messages, options, cancellationToken);
-        
+
         // Handle function calls if present
         if (_options.EnableFunctionCalling)
         {
@@ -98,10 +98,10 @@ public sealed class AzureFoundryAiClient : IAiClient
         }
 
         var content = completion.Value.Content[0].Text;
-        
+
         stopwatch.Stop();
         var response = ParseResponse(content);
-        
+
         _logger.LogInformation("AI reviewed {Path}: {IssueCount} issues found in {Ms}ms (response: {Size} bytes)",
             fileDiff.Path, response.Issues.Count, stopwatch.ElapsedMilliseconds, content.Length);
 
@@ -124,9 +124,9 @@ public sealed class AzureFoundryAiClient : IAiClient
 
         // Use ChatClient for structured outputs support
         var chatClient = _client.GetChatClient(_options.AiFoundryDeployment);
-        
+
         var systemPrompt = await _promptBuilder.BuildMetadataReviewSystemPromptAsync(policy, language, cancellationToken);
-        
+
         var messages = new List<ChatMessage>
         {
             new SystemChatMessage(systemPrompt),
@@ -134,7 +134,7 @@ public sealed class AzureFoundryAiClient : IAiClient
         };
 
         var schema = AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>();
-        
+
         var options = new ChatCompletionOptions
         {
             ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
@@ -145,7 +145,7 @@ public sealed class AzureFoundryAiClient : IAiClient
 
         var completion = await chatClient.CompleteChatAsync(messages, options, cancellationToken);
         var content = completion.Value.Content[0].Text;
-        
+
         return ParseResponse(content);
     }
 
@@ -267,44 +267,44 @@ public sealed class AzureFoundryAiClient : IAiClient
         switch (functionName)
         {
             case "get_full_file_content":
-            {
-                var args = JsonSerializer.Deserialize<FunctionParameters.GetFullFileContentParameters>(argumentsJson)
-                    ?? throw new InvalidOperationException("Failed to deserialize arguments");
-                return await _contextRetriever.GetFullFileContentAsync(args.FilePath);
-            }
+                {
+                    var args = JsonSerializer.Deserialize<FunctionParameters.GetFullFileContentParameters>(argumentsJson)
+                        ?? throw new InvalidOperationException("Failed to deserialize arguments");
+                    return await _contextRetriever.GetFullFileContentAsync(args.FilePath);
+                }
 
             case "get_file_at_commit":
-            {
-                var args = JsonSerializer.Deserialize<FunctionParameters.GetFileAtCommitParameters>(argumentsJson)
-                    ?? throw new InvalidOperationException("Failed to deserialize arguments");
-                return await _contextRetriever.GetFileAtCommitAsync(args.FilePath, args.CommitOrBranch);
-            }
+                {
+                    var args = JsonSerializer.Deserialize<FunctionParameters.GetFileAtCommitParameters>(argumentsJson)
+                        ?? throw new InvalidOperationException("Failed to deserialize arguments");
+                    return await _contextRetriever.GetFileAtCommitAsync(args.FilePath, args.CommitOrBranch);
+                }
 
             case "search_codebase":
-            {
-                var args = JsonSerializer.Deserialize<FunctionParameters.SearchCodebaseParameters>(argumentsJson)
-                    ?? throw new InvalidOperationException("Failed to deserialize arguments");
-                return await _contextRetriever.SearchCodebaseAsync(
-                    args.SearchTerm,
-                    args.FilePattern,
-                    args.MaxResults ?? 10);
-            }
+                {
+                    var args = JsonSerializer.Deserialize<FunctionParameters.SearchCodebaseParameters>(argumentsJson)
+                        ?? throw new InvalidOperationException("Failed to deserialize arguments");
+                    return await _contextRetriever.SearchCodebaseAsync(
+                        args.SearchTerm,
+                        args.FilePattern,
+                        args.MaxResults ?? 10);
+                }
 
             case "get_related_files":
-            {
-                var args = JsonSerializer.Deserialize<FunctionParameters.GetRelatedFilesParameters>(argumentsJson)
-                    ?? throw new InvalidOperationException("Failed to deserialize arguments");
-                return await _contextRetriever.GetRelatedFilesAsync(args.FilePath);
-            }
+                {
+                    var args = JsonSerializer.Deserialize<FunctionParameters.GetRelatedFilesParameters>(argumentsJson)
+                        ?? throw new InvalidOperationException("Failed to deserialize arguments");
+                    return await _contextRetriever.GetRelatedFilesAsync(args.FilePath);
+                }
 
             case "get_file_history":
-            {
-                var args = JsonSerializer.Deserialize<FunctionParameters.GetFileHistoryParameters>(argumentsJson)
-                    ?? throw new InvalidOperationException("Failed to deserialize arguments");
-                return await _contextRetriever.GetFileHistoryAsync(
-                    args.FilePath,
-                    args.MaxCommits ?? 5);
-            }
+                {
+                    var args = JsonSerializer.Deserialize<FunctionParameters.GetFileHistoryParameters>(argumentsJson)
+                        ?? throw new InvalidOperationException("Failed to deserialize arguments");
+                    return await _contextRetriever.GetFileHistoryAsync(
+                        args.FilePath,
+                        args.MaxCommits ?? 5);
+                }
 
             default:
                 return $"Unknown function: {functionName}";

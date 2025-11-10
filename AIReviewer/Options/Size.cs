@@ -12,27 +12,27 @@ namespace AIReviewer.Options;
 public readonly struct Size
 {
     public int Bytes { get; }
-    
+
     public Size(int bytes)
     {
         Bytes = bytes;
     }
-    
+
     public Size(string value)
     {
         Bytes = SizeParser.ParseToBytes(value);
     }
-    
+
     /// <summary>
     /// Implicit conversion to int for seamless usage.
     /// </summary>
     public static implicit operator int(Size size) => size.Bytes;
-    
+
     /// <summary>
     /// Implicit conversion from int.
     /// </summary>
     public static implicit operator Size(int bytes) => new Size(bytes);
-    
+
     public override string ToString() => SizeParser.FormatBytes(Bytes);
 }
 
@@ -46,7 +46,7 @@ public class SizeTypeConverter : TypeConverter
     {
         return sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
     }
-    
+
     public override object? ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
     {
         if (value is string stringValue)
@@ -55,12 +55,12 @@ public class SizeTypeConverter : TypeConverter
         }
         return base.ConvertFrom(context, culture, value);
     }
-    
+
     public override bool CanConvertTo(ITypeDescriptorContext? context, Type? destinationType)
     {
         return destinationType == typeof(string) || base.CanConvertTo(context, destinationType);
     }
-    
+
     public override object? ConvertTo(ITypeDescriptorContext? context, CultureInfo? culture, object? value, Type destinationType)
     {
         if (destinationType == typeof(string) && value is Size size)

@@ -13,11 +13,11 @@ public class AiResponseSchemaGeneratorTests
         var schema = AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>();
         var schemaJson = schema.ToString();
         var schemaDoc = JsonDocument.Parse(schemaJson);
-        
+
         // Assert - Check root level has required for issues
         var rootRequired = schemaDoc.RootElement.GetProperty("required");
         Assert.True(rootRequired.GetArrayLength() > 0, "Root schema should have required array");
-        
+
         var hasIssues = false;
         foreach (var req in rootRequired.EnumerateArray())
         {
@@ -28,19 +28,19 @@ public class AiResponseSchemaGeneratorTests
             }
         }
         Assert.True(hasIssues, "Root schema should require 'issues' property");
-        
+
         // Assert - Check AiIssueSchema definition has required fields
         var definitions = schemaDoc.RootElement.GetProperty("definitions");
         var issueSchema = definitions.GetProperty("AiIssueSchema");
         var issueRequired = issueSchema.GetProperty("required");
-        
+
         // Should have all the required fields from the schema
         var requiredFields = new HashSet<string>();
         foreach (var req in issueRequired.EnumerateArray())
         {
             requiredFields.Add(req.GetString()!);
         }
-        
+
         // Verify all critical fields are in the required array
         Assert.Contains("id", requiredFields);
         Assert.Contains("title", requiredFields);
@@ -52,18 +52,18 @@ public class AiResponseSchemaGeneratorTests
         Assert.Contains("recommendation", requiredFields);
         Assert.Contains("fix_example", requiredFields);
     }
-    
+
     [Fact]
     public void GenerateSchema_ShouldBeCached()
     {
         // Arrange & Act
         var schema1 = AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>();
         var schema2 = AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>();
-        
+
         // Assert - Should return the same cached instance
         Assert.Same(schema1, schema2);
     }
-    
+
     [Fact]
     public void GenerateSchema_ShouldWorkWithGenericType()
     {
@@ -71,7 +71,7 @@ public class AiResponseSchemaGeneratorTests
         var schema = AiResponseSchemaGenerator.GenerateSchema<TestSchema>();
         var schemaJson = schema.ToString();
         var schemaDoc = JsonDocument.Parse(schemaJson);
-        
+
         // Assert - Should have required fields
         var required = schemaDoc.RootElement.GetProperty("required");
         var requiredFields = new HashSet<string>();
@@ -79,11 +79,11 @@ public class AiResponseSchemaGeneratorTests
         {
             requiredFields.Add(req.GetString()!);
         }
-        
+
         Assert.Contains("name", requiredFields);
         Assert.Contains("count", requiredFields);
     }
-    
+
     [Fact]
     public void GenerateSchema_ShouldCachePerType()
     {
@@ -91,24 +91,24 @@ public class AiResponseSchemaGeneratorTests
         var schema1 = AiResponseSchemaGenerator.GenerateSchema<TestSchema>();
         var schema2 = AiResponseSchemaGenerator.GenerateSchema<TestSchema>();
         var differentSchema = AiResponseSchemaGenerator.GenerateSchema<AnotherTestSchema>();
-        
+
         // Assert - Same type should return same cached instance
         Assert.Same(schema1, schema2);
-        
+
         // Different type should return different instance
         Assert.NotSame(schema1, differentSchema);
     }
-    
+
     private sealed record TestSchema(
         [property: JsonPropertyName("name")]
         [property: JsonRequired]
         string Name,
-        
+
         [property: JsonPropertyName("count")]
         [property: JsonRequired]
         int Count
     );
-    
+
     private sealed record AnotherTestSchema(
         [property: JsonPropertyName("value")]
         [property: JsonRequired]

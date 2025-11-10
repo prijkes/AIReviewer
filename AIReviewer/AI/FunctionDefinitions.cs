@@ -65,7 +65,7 @@ public static class FunctionDefinitions
     {
         var schema = JsonSchema.FromType<T>(SchemaSettings);
         var schemaJson = schema.ToJson();
-        
+
         return ChatTool.CreateFunctionTool(
             functionName: functionName,
             functionDescription: description,

@@ -12,7 +12,7 @@ public sealed class ReviewerOptions
     // ========================================================================
     // Dynamic values - loaded from environment variables (credentials, etc.)
     // ========================================================================
-    
+
     /// <summary>
     /// Azure DevOps collection URL (e.g., https://dev.azure.com/organization).
     /// Loaded from ADO_COLLECTION_URL environment variable.
@@ -84,7 +84,7 @@ public sealed class ReviewerOptions
     // ========================================================================
     // Static values - loaded from settings.ini via automatic binding
     // ========================================================================
-    
+
     /// <summary>
     /// AI model configuration settings.
     /// Maps to [AI] section in settings.ini.
@@ -123,185 +123,185 @@ public sealed class ReviewerOptions
     // ========================================================================
     // Backward compatibility properties (for existing code)
     // ========================================================================
-    
+
     /// <summary>
     /// Azure OpenAI deployment/model name to use for reviews.
     /// Shortcut to AI.Deployment for backward compatibility.
     /// </summary>
-    public string AiFoundryDeployment 
-    { 
-        get => AI.Deployment; 
-        set => AI.Deployment = value; 
+    public string AiFoundryDeployment
+    {
+        get => AI.Deployment;
+        set => AI.Deployment = value;
     }
 
     /// <summary>
     /// Temperature parameter for AI model (0.0-1.0). Lower values are more deterministic.
     /// Shortcut to AI.Temperature for backward compatibility.
     /// </summary>
-    public double AiTemperature 
-    { 
-        get => AI.Temperature; 
-        set => AI.Temperature = value; 
+    public double AiTemperature
+    {
+        get => AI.Temperature;
+        set => AI.Temperature = value;
     }
 
     /// <summary>
     /// Maximum number of tokens for AI response.
     /// Shortcut to AI.MaxTokens for backward compatibility.
     /// </summary>
-    public int AiMaxTokens 
-    { 
-        get => AI.MaxTokens; 
-        set => AI.MaxTokens = value; 
+    public int AiMaxTokens
+    {
+        get => AI.MaxTokens;
+        set => AI.MaxTokens = value;
     }
 
     /// <summary>
     /// Enables OpenAI function calling.
     /// Shortcut to FunctionCalling.Enabled for backward compatibility.
     /// </summary>
-    public bool EnableFunctionCalling 
-    { 
-        get => FunctionCalling.Enabled; 
-        set => FunctionCalling.Enabled = value; 
+    public bool EnableFunctionCalling
+    {
+        get => FunctionCalling.Enabled;
+        set => FunctionCalling.Enabled = value;
     }
 
     /// <summary>
     /// Maximum number of function calls the AI can make during a single review.
     /// Shortcut to FunctionCalling.MaxCalls for backward compatibility.
     /// </summary>
-    public int MaxFunctionCalls 
-    { 
-        get => FunctionCalling.MaxCalls; 
-        set => FunctionCalling.MaxCalls = value; 
+    public int MaxFunctionCalls
+    {
+        get => FunctionCalling.MaxCalls;
+        set => FunctionCalling.MaxCalls = value;
     }
 
     /// <summary>
     /// When true, performs review without posting comments or approvals to Azure DevOps.
     /// Shortcut to Review.DryRun for backward compatibility.
     /// </summary>
-    public bool DryRun 
-    { 
-        get => Review.DryRun; 
-        set => Review.DryRun = value; 
+    public bool DryRun
+    {
+        get => Review.DryRun;
+        set => Review.DryRun = value;
     }
 
     /// <summary>
     /// When true, only run the review if the PAT user has been added as a required reviewer to the PR.
     /// Shortcut to Review.OnlyReviewIfRequiredReviewer for backward compatibility.
     /// </summary>
-    public bool OnlyReviewIfRequiredReviewer 
-    { 
-        get => Review.OnlyReviewIfRequiredReviewer; 
-        set => Review.OnlyReviewIfRequiredReviewer = value; 
+    public bool OnlyReviewIfRequiredReviewer
+    {
+        get => Review.OnlyReviewIfRequiredReviewer;
+        set => Review.OnlyReviewIfRequiredReviewer = value;
     }
 
     /// <summary>
     /// Scope of files to review.
     /// Shortcut to Review.Scope for backward compatibility.
     /// </summary>
-    public string ReviewScope 
-    { 
-        get => Review.Scope; 
-        set => Review.Scope = value; 
+    public string ReviewScope
+    {
+        get => Review.Scope;
+        set => Review.Scope = value;
     }
 
     /// <summary>
     /// Maximum number of warnings before rejecting approval.
     /// Shortcut to Review.WarnBudget for backward compatibility.
     /// </summary>
-    public int WarnBudget 
-    { 
-        get => Review.WarnBudget; 
-        set => Review.WarnBudget = value; 
+    public int WarnBudget
+    {
+        get => Review.WarnBudget;
+        set => Review.WarnBudget = value;
     }
 
     /// <summary>
     /// Path to the review policy markdown file.
     /// Shortcut to Review.PolicyPath for backward compatibility.
     /// </summary>
-    public string PolicyPath 
-    { 
-        get => Review.PolicyPath; 
-        set => Review.PolicyPath = value; 
+    public string PolicyPath
+    {
+        get => Review.PolicyPath;
+        set => Review.PolicyPath = value;
     }
 
     /// <summary>
     /// Base path to the prompts directory.
     /// Shortcut to Review.PromptsBasePath for backward compatibility.
     /// </summary>
-    public string PromptsBasePath 
-    { 
-        get => Review.PromptsBasePath; 
-        set => Review.PromptsBasePath = value; 
+    public string PromptsBasePath
+    {
+        get => Review.PromptsBasePath;
+        set => Review.PromptsBasePath = value;
     }
 
     /// <summary>
     /// Maximum file size in bytes to review.
     /// Shortcut to Files.MaxFileBytes for backward compatibility.
     /// </summary>
-    public int MaxFileBytes 
-    { 
-        get => Files.MaxFileBytes; 
-        set => Files.MaxFileBytes = value; 
+    public int MaxFileBytes
+    {
+        get => Files.MaxFileBytes;
+        set => Files.MaxFileBytes = value;
     }
 
     /// <summary>
     /// Maximum diff size in bytes to send to AI.
     /// Shortcut to Files.MaxDiffBytes for backward compatibility.
     /// </summary>
-    public int MaxDiffBytes 
-    { 
-        get => Files.MaxDiffBytes; 
-        set => Files.MaxDiffBytes = value; 
+    public int MaxDiffBytes
+    {
+        get => Files.MaxDiffBytes;
+        set => Files.MaxDiffBytes = value;
     }
 
     /// <summary>
     /// Maximum number of files to review in a single PR.
     /// Shortcut to Files.MaxFilesToReview for backward compatibility.
     /// </summary>
-    public int MaxFilesToReview 
-    { 
-        get => Files.MaxFilesToReview; 
-        set => Files.MaxFilesToReview = value; 
+    public int MaxFilesToReview
+    {
+        get => Files.MaxFilesToReview;
+        set => Files.MaxFilesToReview = value;
     }
 
     /// <summary>
     /// Maximum number of issues to report per file.
     /// Shortcut to Files.MaxIssuesPerFile for backward compatibility.
     /// </summary>
-    public int MaxIssuesPerFile 
-    { 
-        get => Files.MaxIssuesPerFile; 
-        set => Files.MaxIssuesPerFile = value; 
+    public int MaxIssuesPerFile
+    {
+        get => Files.MaxIssuesPerFile;
+        set => Files.MaxIssuesPerFile = value;
     }
 
     /// <summary>
     /// Maximum number of commit messages to include in metadata review.
     /// Shortcut to Files.MaxCommitMessagesToReview for backward compatibility.
     /// </summary>
-    public int MaxCommitMessagesToReview 
-    { 
-        get => Files.MaxCommitMessagesToReview; 
-        set => Files.MaxCommitMessagesToReview = value; 
+    public int MaxCommitMessagesToReview
+    {
+        get => Files.MaxCommitMessagesToReview;
+        set => Files.MaxCommitMessagesToReview = value;
     }
 
     /// <summary>
     /// Maximum diff size in bytes to include in AI prompt.
     /// Shortcut to Files.MaxPromptDiffBytes for backward compatibility.
     /// </summary>
-    public int MaxPromptDiffBytes 
-    { 
-        get => Files.MaxPromptDiffBytes; 
-        set => Files.MaxPromptDiffBytes = value; 
+    public int MaxPromptDiffBytes
+    {
+        get => Files.MaxPromptDiffBytes;
+        set => Files.MaxPromptDiffBytes = value;
     }
 
     /// <summary>
     /// Threshold ratio for detecting Japanese language in PR descriptions.
     /// Shortcut to Language.JapaneseDetectionThreshold for backward compatibility.
     /// </summary>
-    public double JapaneseDetectionThreshold 
-    { 
-        get => Language.JapaneseDetectionThreshold; 
-        set => Language.JapaneseDetectionThreshold = value; 
+    public double JapaneseDetectionThreshold
+    {
+        get => Language.JapaneseDetectionThreshold;
+        set => Language.JapaneseDetectionThreshold = value;
     }
 
     /// <summary>

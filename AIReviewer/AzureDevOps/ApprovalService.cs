@@ -33,7 +33,7 @@ public sealed class ApprovalService(ILogger<ApprovalService> logger, IAdoSdkClie
 
         short desiredVote = (short)(result.ErrorCount == 0 && result.WarningCount <= result.WarnBudget ? 10 : 0);
         var decision = desiredVote == 10 ? "APPROVE" : "WAIT_FOR_AUTHOR";
-        
+
         logger.LogInformation("Approval decision: {Decision} (Errors: {Errors}, Warnings: {Warnings}/{Budget})",
             decision, result.ErrorCount, result.WarningCount, result.WarnBudget);
 

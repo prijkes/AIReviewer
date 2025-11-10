@@ -21,12 +21,12 @@ public class DiffServiceTests
         _loggerMock = new Mock<ILogger<DiffService>>();
         _adoClientMock = new Mock<IAdoSdkClient>();
         _optionsMock = new Mock<IOptionsMonitor<ReviewerOptions>>();
-        
+
         _options = new ReviewerOptions
         {
             MaxDiffBytes = 10000
         };
-        
+
         _optionsMock.Setup(x => x.CurrentValue).Returns(_options);
         _diffService = new DiffService(_loggerMock.Object, _adoClientMock.Object, _optionsMock.Object);
     }
@@ -37,7 +37,7 @@ public class DiffServiceTests
         // Arrange
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
-        
+
         var changes = new GitPullRequestIterationChanges
         {
             ChangeEntries =
@@ -85,7 +85,7 @@ public class DiffServiceTests
         // Arrange
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
-        
+
         var changes = new GitPullRequestIterationChanges
         {
             ChangeEntries =
@@ -122,7 +122,7 @@ public class DiffServiceTests
         // Arrange
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
-        
+
         var changes = new GitPullRequestIterationChanges
         {
             ChangeEntries =
@@ -168,7 +168,7 @@ public class DiffServiceTests
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
         var largeDiff = new string('x', 15000); // Exceeds MaxDiffBytes (10000)
-        
+
         var changes = new GitPullRequestIterationChanges
         {
             ChangeEntries =
@@ -214,7 +214,7 @@ public class DiffServiceTests
         // Arrange
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
-        
+
         var changes = new GitPullRequestIterationChanges
         {
             ChangeEntries =
@@ -316,7 +316,7 @@ public class DiffServiceTests
         // Arrange
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
-        
+
         var changes = new GitPullRequestIterationChanges
         {
             ChangeEntries = null
@@ -343,7 +343,7 @@ public class DiffServiceTests
         // Arrange
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
-        
+
         var changes = new GitPullRequestIterationChanges
         {
             ChangeEntries =
@@ -380,7 +380,7 @@ public class DiffServiceTests
         // Arrange
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
-        
+
         var changes = new GitPullRequestIterationChanges
         {
             ChangeEntries =
@@ -434,7 +434,7 @@ public class DiffServiceTests
         // Arrange
         var pr = CreateTestPullRequest();
         var iteration = new GitPullRequestIteration { Id = 1 };
-        
+
         var changes = new GitPullRequestIterationChanges
         {
             ChangeEntries =

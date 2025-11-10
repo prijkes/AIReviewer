@@ -40,11 +40,11 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
     public async Task<string> GetFullFileContentAsync(string filePath)
     {
         EnsureContextSet();
-        
+
         try
         {
             logger.LogDebug("AI requested full file content: {FilePath}", filePath);
-            
+
             var item = await adoClient.GetFileContentAsync(
                 filePath,
                 _currentPrContext!.PullRequest.TargetRefName);
@@ -74,18 +74,18 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
     public async Task<string> GetFileAtCommitAsync(string filePath, string commitOrBranch)
     {
         EnsureContextSet();
-        
+
         try
         {
             logger.LogDebug("AI requested file at commit: {FilePath} @ {Commit}", filePath, commitOrBranch);
-            
+
             // If it looks like a branch name, prepend refs/heads/
-            var versionDescriptor = commitOrBranch.StartsWith("refs/") 
-                ? commitOrBranch 
+            var versionDescriptor = commitOrBranch.StartsWith("refs/")
+                ? commitOrBranch
                 : commitOrBranch.Length == 40 // SHA hash
-                    ? commitOrBranch 
+                    ? commitOrBranch
                     : $"refs/heads/{commitOrBranch}";
-            
+
             var item = await adoClient.GetFileContentAsync(
                 filePath,
                 versionDescriptor);
@@ -95,7 +95,7 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
                 return $"File not found at {commitOrBranch}: {filePath}";
             }
 
-            logger.LogInformation("Retrieved {Size} bytes for {FilePath} @ {Commit}", 
+            logger.LogInformation("Retrieved {Size} bytes for {FilePath} @ {Commit}",
                 item.Content.Length, filePath, commitOrBranch);
             return item.Content;
         }
@@ -117,15 +117,15 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
     public async Task<string> SearchCodebaseAsync(string searchTerm, string? filePattern = null, int maxResults = FunctionDefaults.SearchDefaultMaxResults)
     {
         EnsureContextSet();
-        
+
         // Clamp to reasonable limits
         maxResults = Math.Clamp(maxResults, 1, FunctionDefaults.SearchMaxResultsLimit);
-        
+
         try
         {
-            logger.LogDebug("AI searching codebase: '{SearchTerm}' (pattern: {Pattern}, maxResults: {MaxResults})", 
+            logger.LogDebug("AI searching codebase: '{SearchTerm}' (pattern: {Pattern}, maxResults: {MaxResults})",
                 searchTerm, filePattern ?? "all", maxResults);
-            
+
             var searchResults = await adoClient.SearchCodeAsync(
                 searchTerm,
                 _currentPrContext!.PullRequest.TargetRefName,
@@ -139,7 +139,7 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
 
             var sb = new StringBuilder();
             sb.AppendLine($"Found {searchResults.Count} result(s) for '{searchTerm}':");
-            
+
             foreach (var result in searchResults)
             {
                 sb.AppendLine($"\n{result.FilePath} (line {result.LineNumber}):");
@@ -165,16 +165,16 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
     public async Task<string> GetRelatedFilesAsync(string filePath)
     {
         EnsureContextSet();
-        
+
         try
         {
             logger.LogDebug("AI requested related files for: {FilePath}", filePath);
-            
+
             // For C# files, we can look for:
             // 1. Files in the same namespace
             // 2. Files that import this file's namespace
             // 3. Files in the same directory
-            
+
             var fileContent = await GetFullFileContentAsync(filePath);
             if (fileContent.StartsWith("Error") || fileContent.StartsWith("File not found"))
             {
@@ -190,7 +190,7 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
             {
                 var namespaceName = namespaceMatch.Groups[1].Value;
                 sb.AppendLine($"\nFiles in same namespace '{namespaceName}':");
-                
+
                 var sameNamespaceFiles = await adoClient.SearchCodeAsync(
                     $"namespace {namespaceName}",
                     _currentPrContext!.PullRequest.TargetRefName,
@@ -236,14 +236,14 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
     public async Task<string> GetFileHistoryAsync(string filePath, int maxCommits = FunctionDefaults.FileHistoryDefaultMaxCommits)
     {
         EnsureContextSet();
-        
+
         // Clamp to reasonable limits
         maxCommits = Math.Clamp(maxCommits, 1, FunctionDefaults.FileHistoryMaxCommitsLimit);
-        
+
         try
         {
             logger.LogDebug("AI requested file history: {FilePath} (maxCommits: {MaxCommits})", filePath, maxCommits);
-            
+
             var commits = await adoClient.GetFileHistoryAsync(
                 filePath,
                 _currentPrContext!.PullRequest.TargetRefName,
@@ -256,7 +256,7 @@ public sealed partial class ReviewContextRetriever(ILogger<ReviewContextRetrieve
 
             var sb = new StringBuilder();
             sb.AppendLine($"Recent commits for {filePath}:");
-            
+
             foreach (var commit in commits)
             {
                 // When using LocalGitProvider, the Comment contains the full formatted string

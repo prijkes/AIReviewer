@@ -58,38 +58,38 @@ public sealed partial class DiffChunker(ILogger<DiffChunker> logger)
             {
                 // Try to find a good boundary to split at
                 var splitPoint = FindBestSplitPoint(lines, lastHunkLine, i);
-                
+
                 if (splitPoint > lastHunkLine && splitPoint < i)
                 {
                     // Create chunk up to split point
                     var chunkContent = BuildChunkContent(lines, currentChunkStartLine - 1, splitPoint);
                     chunks.Add(CreateChunk(diff.Path, chunkContent, chunkIndex, currentChunkStartLine, lastHunkHeader));
-                    
+
                     // Start new chunk from split point
                     currentChunk.Clear();
                     currentChunkStartLine = splitPoint + 1;
                     chunkIndex++;
-                    
+
                     // Add lines from split point to current
                     for (int j = splitPoint; j <= i; j++)
                     {
                         currentChunk.AppendLine(lines[j]);
                     }
-                    
+
                     lastHunkLine = i;
                     lastHunkHeader = ExtractHunkContext(line, i);
                     continue;
                 }
-                
+
                 // No good split point found, split here but try to avoid splitting change blocks
                 var adjustedSplit = AdjustSplitToAvoidChangeBlock(lines, i);
                 var adjustedContent = BuildChunkContent(lines, currentChunkStartLine - 1, adjustedSplit);
                 chunks.Add(CreateChunk(diff.Path, adjustedContent, chunkIndex, currentChunkStartLine, lastHunkHeader));
-                
+
                 currentChunk.Clear();
                 currentChunkStartLine = adjustedSplit + 2; // +2 because we include one more line
                 chunkIndex++;
-                
+
                 // Add remaining lines to new chunk
                 for (int j = adjustedSplit + 1; j <= i; j++)
                 {
@@ -119,12 +119,12 @@ public sealed partial class DiffChunker(ILogger<DiffChunker> logger)
         foreach (var chunk in chunks)
         {
             chunk.TotalChunks = totalChunks;
-            chunk.DisplayName = totalChunks > 1 
-                ? $"{chunk.FilePath} (chunk {chunk.ChunkIndex + 1}/{totalChunks}: {chunk.Context})" 
+            chunk.DisplayName = totalChunks > 1
+                ? $"{chunk.FilePath} (chunk {chunk.ChunkIndex + 1}/{totalChunks}: {chunk.Context})"
                 : chunk.FilePath;
         }
 
-        logger.LogInformation("Split {FilePath} into {ChunkCount} chunks (original size: {OriginalSize} bytes)", 
+        logger.LogInformation("Split {FilePath} into {ChunkCount} chunks (original size: {OriginalSize} bytes)",
             diff.Path, totalChunks, diff.DiffText.Length);
 
         return chunks;
@@ -148,7 +148,7 @@ public sealed partial class DiffChunker(ILogger<DiffChunker> logger)
         // Strategy 2: Look for empty lines (common logical boundaries in any language)
         for (int i = end - 1; i > start; i--)
         {
-            if (string.IsNullOrWhiteSpace(lines[i]) || 
+            if (string.IsNullOrWhiteSpace(lines[i]) ||
                 (lines[i].Length > 0 && string.IsNullOrWhiteSpace(lines[i].TrimStart('+', '-', ' '))))
             {
                 return i;
@@ -190,7 +190,7 @@ public sealed partial class DiffChunker(ILogger<DiffChunker> logger)
                 }
             }
         }
-        
+
         return proposedSplit;
     }
 
@@ -211,7 +211,7 @@ public sealed partial class DiffChunker(ILogger<DiffChunker> logger)
     /// Determines if a line is a diff hunk header.
     /// Hunk headers start with @@ and are a universal part of unified diff format.
     /// </summary>
-    private static bool IsDiffHunkHeader(string line) => 
+    private static bool IsDiffHunkHeader(string line) =>
         line.TrimStart().StartsWith("@@") && DiffHunkHeaderPattern.IsMatch(line);
 
     /// <summary>
@@ -230,9 +230,9 @@ public sealed partial class DiffChunker(ILogger<DiffChunker> logger)
                 var context = line.Contains("@@", StringComparison.Ordinal) && line.LastIndexOf("@@") < line.Length - 2
                     ? line[(line.LastIndexOf("@@") + 2)..].Trim()
                     : "";
-                
-                return string.IsNullOrEmpty(context) 
-                    ? $"Lines starting at {newStart}" 
+
+                return string.IsNullOrEmpty(context)
+                    ? $"Lines starting at {newStart}"
                     : $"{context} (line {newStart})";
             }
         }

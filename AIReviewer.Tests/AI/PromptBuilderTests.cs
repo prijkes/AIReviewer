@@ -27,11 +27,11 @@ public class PromptBuilderTests
             MaxCommitMessagesToReview = 5
         };
         _optionsMock.Setup(x => x.CurrentValue).Returns(_options);
-        
+
         // Mock PromptLoader
         var promptLoaderLoggerMock = new Mock<ILogger<PromptLoader>>();
         _promptLoaderMock = new Mock<PromptLoader>(promptLoaderLoggerMock.Object, _optionsMock.Object);
-        
+
         // Setup mock responses for different prompts
         _promptLoaderMock.Setup(x => x.LoadSystemPromptAsync(It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProgrammingLanguageDetector.ProgrammingLanguage lang, CancellationToken ct) =>
@@ -40,19 +40,19 @@ public class PromptBuilderTests
                     : lang == ProgrammingLanguageDetector.ProgrammingLanguage.Cpp
                         ? "You are an expert C++ code reviewer"
                         : "You are an expert code reviewer");
-        
+
         _promptLoaderMock.Setup(x => x.LoadLanguageInstructionAsync("en", It.IsAny<CancellationToken>()))
             .ReturnsAsync("IMPORTANT: Provide all review feedback in English language.");
-        
+
         _promptLoaderMock.Setup(x => x.LoadLanguageInstructionAsync("ja", It.IsAny<CancellationToken>()))
             .ReturnsAsync("IMPORTANT: Provide all review feedback in Japanese language.");
-        
+
         _promptLoaderMock.Setup(x => x.LoadFileReviewInstructionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync("Apply the policy rubric. Report up to 5 actionable issues. Leave summary empty.");
-        
+
         _promptLoaderMock.Setup(x => x.LoadMetadataReviewInstructionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync("Review the PR metadata for hygiene and completeness.\n\nMetadata review rubric: Ensure descriptive title, summary of changes, tests documented.");
-        
+
         _promptBuilder = new PromptBuilder(_loggerMock.Object, _optionsMock.Object, _promptLoaderMock.Object);
     }
 

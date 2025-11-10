@@ -85,4 +85,12 @@ public interface IAdoSdkClient
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>List of existing comments on the file.</returns>
     Task<List<ExistingComment>> GetExistingCommentsAsync(Guid repoId, int prId, string? filePath, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Processes pre-fetched threads into existing comments grouped by file.
+    /// This avoids re-fetching threads for each file during parallel reviews.
+    /// </summary>
+    /// <param name="threads">The pre-fetched threads.</param>
+    /// <returns>Dictionary mapping file paths to their existing comments.</returns>
+    Dictionary<string, List<ExistingComment>> GetExistingCommentsFromThreads(List<GitPullRequestCommentThread> threads);
 }

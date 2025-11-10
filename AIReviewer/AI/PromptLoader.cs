@@ -86,7 +86,7 @@ public sealed class PromptLoader(ILogger<PromptLoader> logger, IOptionsMonitor<R
         }
 
         var fullPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), path));
-        
+
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException($"Prompt file not found at {fullPath}");
@@ -94,7 +94,7 @@ public sealed class PromptLoader(ILogger<PromptLoader> logger, IOptionsMonitor<R
 
         var content = await File.ReadAllTextAsync(fullPath, cancellationToken);
         logger.LogDebug("Loaded prompt file {PromptPath} (chars: {Length})", fullPath, content.Length);
-        
+
         _promptCache[path] = content;
         return content;
     }

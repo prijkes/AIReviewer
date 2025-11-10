@@ -51,7 +51,7 @@ public sealed class LocalGitProvider : IDisposable
         try
         {
             filePath = NormalizePath(filePath);
-            
+
             var commit = ResolveCommit(versionDescriptor);
             if (commit == null)
             {
@@ -68,7 +68,7 @@ public sealed class LocalGitProvider : IDisposable
 
             var blob = (Blob)treeEntry.Target;
             var content = blob.GetContentText();
-            
+
             _logger.LogDebug("Retrieved {Size} bytes for {FilePath}", content.Length, filePath);
             return content;
         }
@@ -131,14 +131,14 @@ public sealed class LocalGitProvider : IDisposable
             var filePatternRegex = CompileFilePattern(filePattern);
             var allFiles = CollectFiles(commit.Tree);
 
-            _logger.LogDebug("Searching {FileCount} files in parallel for: '{SearchTerm}'", 
+            _logger.LogDebug("Searching {FileCount} files in parallel for: '{SearchTerm}'",
                 allFiles.Count, searchTerm);
 
             var results = SearchFilesInParallel(allFiles, searchTerm, filePatternRegex, maxResults);
-            
-            _logger.LogInformation("Found {ResultCount} results for '{SearchTerm}' (searched {FileCount} files)", 
+
+            _logger.LogInformation("Found {ResultCount} results for '{SearchTerm}' (searched {FileCount} files)",
                 results.Count, searchTerm, allFiles.Count);
-            
+
             return results;
         }
         catch (Exception ex)
@@ -159,8 +159,8 @@ public sealed class LocalGitProvider : IDisposable
 
         Parallel.ForEach(
             files,
-            new ParallelOptions 
-            { 
+            new ParallelOptions
+            {
                 MaxDegreeOfParallelism = Environment.ProcessorCount,
                 CancellationToken = cancellation.Token
             },
@@ -221,12 +221,12 @@ public sealed class LocalGitProvider : IDisposable
     private static string BuildContext(string[] lines, int lineIndex)
     {
         var context = new StringBuilder();
-        
+
         if (lineIndex > 0)
             context.AppendLine(lines[lineIndex - 1]);
-        
+
         context.AppendLine(lines[lineIndex]);
-        
+
         if (lineIndex < lines.Length - 1)
             context.AppendLine(lines[lineIndex + 1]);
 
@@ -253,7 +253,7 @@ public sealed class LocalGitProvider : IDisposable
                 case TreeEntryTargetType.Tree:
                     CollectFilesRecursive((Tree)entry.Target, fullPath, files);
                     break;
-                
+
                 case TreeEntryTargetType.Blob:
                     files.Add(new FileEntry(fullPath, (Blob)entry.Target));
                     break;
@@ -313,7 +313,7 @@ public sealed class LocalGitProvider : IDisposable
 
             // Get the patch for the file
             var patch = _repository.Diff.Compare<Patch>(baseCommitObj.Tree, targetCommitObj.Tree, new[] { filePath });
-            
+
             if (patch == null || !patch.Any())
             {
                 _logger.LogDebug("No diff found for {FilePath} between {Base} and {Target}", filePath, baseCommit, targetCommit);

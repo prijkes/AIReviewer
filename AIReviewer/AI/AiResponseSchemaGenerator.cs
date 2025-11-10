@@ -26,10 +26,10 @@ internal static class AiResponseSchemaGenerator
     public static BinaryData GenerateSchema<T>() where T : class
     {
         var type = typeof(T);
-        
+
         // Validate that all properties have JsonRequired attribute
         ValidateAllPropertiesRequired(type);
-        
+
         if (!_schemaCache.TryGetValue(type, out var cachedSchema))
         {
             lock (_lock)
@@ -54,7 +54,7 @@ internal static class AiResponseSchemaGenerator
                     };
 
                     var schema = JsonSchema.FromType<T>(settings);
-                    
+
                     // Configure schema to be strict
                     schema.AllowAdditionalProperties = false;
 
@@ -63,7 +63,7 @@ internal static class AiResponseSchemaGenerator
 
                     string schemaJson = schema.ToJson();
                     cachedSchema = BinaryData.FromString(schemaJson);
-                    
+
                     _schemaCache[type] = cachedSchema;
                 }
             }
@@ -79,31 +79,31 @@ internal static class AiResponseSchemaGenerator
     private static void ValidateAllPropertiesRequired(Type type)
     {
         var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-        
+
         foreach (var property in properties)
         {
             var hasJsonRequired = property.GetCustomAttribute<JsonRequiredAttribute>() != null;
             var hasRequiredModifier = property.GetCustomAttribute<System.Runtime.CompilerServices.RequiredMemberAttribute>() != null;
-            
+
             if (!hasJsonRequired && !hasRequiredModifier)
             {
                 throw new InvalidOperationException(
                     $"Property '{property.Name}' on type '{type.Name}' must have the [JsonRequired] attribute. " +
                     $"OpenAI's structured outputs require all properties to be marked as required.");
             }
-            
+
             // Recursively validate nested types (but not primitives, enums, or collections)
             var propertyType = property.PropertyType;
-            
+
             // Unwrap nullable types
             propertyType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
-            
+
             // Unwrap collection types
             if (propertyType.IsGenericType)
             {
                 var genericDef = propertyType.GetGenericTypeDefinition();
-                if (genericDef == typeof(IReadOnlyList<>) || 
-                    genericDef == typeof(IList<>) || 
+                if (genericDef == typeof(IReadOnlyList<>) ||
+                    genericDef == typeof(IList<>) ||
                     genericDef == typeof(List<>) ||
                     genericDef == typeof(IEnumerable<>) ||
                     genericDef == typeof(ICollection<>))
@@ -111,11 +111,11 @@ internal static class AiResponseSchemaGenerator
                     propertyType = propertyType.GetGenericArguments()[0];
                 }
             }
-            
+
             // Only validate custom types (not primitives, enums, or system types)
-            if (propertyType.IsClass && 
-                !propertyType.IsPrimitive && 
-                !propertyType.IsEnum && 
+            if (propertyType.IsClass &&
+                !propertyType.IsPrimitive &&
+                !propertyType.IsEnum &&
                 propertyType != typeof(string) &&
                 propertyType.Namespace != null &&
                 !propertyType.Namespace.StartsWith("System"))
@@ -193,17 +193,17 @@ internal static class AiResponseSchemaGenerator
                 // Check if property has JsonRequired attribute or C# required modifier
                 var hasJsonRequired = property.GetAttribute<JsonRequiredAttribute>(inherit: false) != null;
                 var hasRequiredModifier = property.GetAttribute<System.Runtime.CompilerServices.RequiredMemberAttribute>(inherit: false) != null;
-                
+
                 if (hasJsonRequired || hasRequiredModifier)
                 {
                     // Get the JSON property name (respecting JsonPropertyName attribute)
                     var jsonPropertyNameAttr = property.GetAttribute<JsonPropertyNameAttribute>(inherit: false);
                     var jsonPropertyName = jsonPropertyNameAttr?.Name ?? property.Name;
-                    
+
                     // Find the corresponding schema property by the JSON name
                     var schemaProperty = context.Schema.Properties
                         .FirstOrDefault(x => x.Key.Equals(jsonPropertyName, StringComparison.OrdinalIgnoreCase));
-                    
+
                     if (schemaProperty.Value != null)
                     {
                         // Mark the property as required in the schema

@@ -45,7 +45,7 @@ public static class SizeParser
         };
 
         var result = (long)(value * multiplier);
-        
+
         if (result > int.MaxValue)
         {
             throw new FormatException($"Size too large: '{sizeString}' = {result} bytes (max: {int.MaxValue} bytes)");

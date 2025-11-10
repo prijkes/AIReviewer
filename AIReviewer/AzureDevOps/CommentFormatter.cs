@@ -23,7 +23,7 @@ public static class CommentFormatter
         builder.AppendLine(issue.Rationale);
         builder.AppendLine();
         builder.AppendLine($"**Recommendation**: {issue.Recommendation}");
-        
+
         if (!string.IsNullOrWhiteSpace(issue.FixExample))
         {
             builder.AppendLine();
@@ -34,7 +34,7 @@ public static class CommentFormatter
 
         builder.AppendLine();
         builder.AppendLine("_I'm a bot; reply here to discuss. Set `DRY_RUN=true` to preview without posting._");
-        
+
         return builder.ToString();
     }
 

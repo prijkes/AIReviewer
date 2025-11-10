@@ -44,10 +44,10 @@ public class JsonHelperTests
     public void Serialize_WithNonNullProperties_ShouldIncludeAllValues()
     {
         // Arrange
-        var obj = new TestModel 
-        { 
-            Name = "John", 
-            Age = 30, 
+        var obj = new TestModel
+        {
+            Name = "John",
+            Age = 30,
             Tags = ["developer", "tester"]
         };
 

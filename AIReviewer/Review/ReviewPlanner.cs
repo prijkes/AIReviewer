@@ -59,10 +59,11 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     /// <param name="pr">The pull request context.</param>
     /// <param name="iteration">The current PR iteration.</param>
     /// <param name="diffs">The list of file diffs to review.</param>
+    /// <param name="threads">The threads to analyze.</param>
     /// <param name="basePolicyPath">The base policy file path.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A <see cref="ReviewPlanResult"/> containing all identified issues and counts.</returns>
-    public async Task<ReviewPlanResult> PlanAsync(PullRequestContext pr, GitPullRequestIteration iteration, IReadOnlyList<ReviewFileDiff> diffs, string basePolicyPath, CancellationToken cancellationToken)
+    public async Task<ReviewPlanResult> PlanAsync(PullRequestContext pr, GitPullRequestIteration iteration, IReadOnlyList<ReviewFileDiff> diffs, List<GitPullRequestCommentThread> threads, string basePolicyPath, CancellationToken cancellationToken)
     {
         // Set PR context for function calling (if available)
         contextRetriever?.SetContext(pr);
@@ -70,7 +71,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
         // Detect language from PR description
         var prDescription = pr.PullRequest.Description ?? string.Empty;
         var language = LanguageDetector.DetectLanguage(prDescription, _options.JapaneseDetectionThreshold);
-        logger.LogInformation("Detected review language: {Language} (based on PR description, threshold: {Threshold})", 
+        logger.LogInformation("Detected review language: {Language} (based on PR description, threshold: {Threshold})",
             language, _options.JapaneseDetectionThreshold);
 
         if (diffs.Count > _options.MaxFilesToReview)
@@ -92,9 +93,16 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
             })
             .ToList();
 
-        // Review files in parallel
-        var reviewTasks = diffsToReview.Select(diff => 
-            ReviewFileAsync(pr, diff, basePolicyPath, language, iteration.Id ?? 0, cancellationToken));
+        var existingCommentsByFile = adoClient.GetExistingCommentsFromThreads(threads);
+
+        logger.LogInformation("Pre-fetched {ThreadCount} threads with comments for {FileCount} files to optimize parallel reviews",
+            threads.Count, existingCommentsByFile.Count);
+
+        // Review files in parallel with pre-fetched comments
+        var reviewTasks = diffsToReview.Select(diff =>
+            ReviewFileAsync(diff, basePolicyPath, language, iteration.Id ?? 0,
+                existingCommentsByFile.GetValueOrDefault(diff.Path, []),
+                cancellationToken));
 
         var fileResults = await Task.WhenAll(reviewTasks);
 
@@ -115,14 +123,14 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
     /// <summary>
     /// Reviews a single file and returns the identified issues.
     /// Detects the programming language and loads the appropriate policy.
-    /// Retrieves existing comments to provide context and avoid duplicates.
+    /// Uses pre-fetched existing comments to provide context and avoid duplicates.
     /// </summary>
     private async Task<List<ReviewIssue>> ReviewFileAsync(
-        PullRequestContext pr,
-        ReviewFileDiff diff, 
-        string basePolicyPath, 
-        string language, 
-        int iterationId, 
+        ReviewFileDiff diff,
+        string basePolicyPath,
+        string language,
+        int iterationId,
+        List<ExistingComment> existingComments,
         CancellationToken cancellationToken)
     {
         var issues = new List<ReviewIssue>();
@@ -131,25 +139,22 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
         {
             // Detect programming language for the file
             var programmingLanguage = ProgrammingLanguageDetector.DetectLanguage(diff.Path);
-            
+
             // Log the detected programming language
-            logger.LogDebug("File {Path} detected as {Language}", 
-                diff.Path, 
+            logger.LogDebug("File {Path} detected as {Language}",
+                diff.Path,
                 ProgrammingLanguageDetector.GetDisplayName(programmingLanguage));
 
             // Load language-specific policy
             var policy = await policyLoader.LoadLanguageSpecificAsync(basePolicyPath, programmingLanguage, cancellationToken);
 
-            // Retrieve existing comments for this file to provide context and avoid duplicates
-            var existingComments = await adoClient.GetExistingCommentsAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, diff.Path, cancellationToken);
-
-            logger.LogDebug("Found {CommentCount} existing comments on {FilePath}", existingComments.Count, diff.Path);
+            logger.LogDebug("Using {CommentCount} pre-fetched existing comments for {FilePath}", existingComments.Count, diff.Path);
 
             var aiResponse = await aiClient.ReviewAsync(policy, diff, language, programmingLanguage, existingComments, cancellationToken);
-            
+
             if (aiResponse.Issues.Count > _options.MaxIssuesPerFile)
             {
-                logger.LogWarning("File {Path} has {TotalIssues} issues, reporting first {MaxIssues} only", 
+                logger.LogWarning("File {Path} has {TotalIssues} issues, reporting first {MaxIssues} only",
                     diff.Path, aiResponse.Issues.Count, _options.MaxIssuesPerFile);
             }
 
@@ -159,7 +164,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
                 logger.LogInformation(
                     "[FINGERPRINT] Generated fingerprint for {FilePath}:{Line} = {Fingerprint} (IterationId={IterationId}, FileHash={FileHash})",
                     diff.Path, issue.Line, fingerprint, iterationId, diff.FileHash);
-                
+
                 issues.Add(new ReviewIssue
                 {
                     Id = issue.Id,
@@ -208,7 +213,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
             logger.LogInformation(
                 "[FINGERPRINT-METADATA] Generated fingerprint for metadata issue = {Fingerprint} (Id={Id}, Title={Title}, IterationId={IterationId})",
                 fingerprint, issue.Id, issue.Title, iterationId ?? 0);
-            
+
             return new ReviewIssue
             {
                 Id = issue.Id,

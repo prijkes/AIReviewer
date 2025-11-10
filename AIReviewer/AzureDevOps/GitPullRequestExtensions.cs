@@ -9,13 +9,13 @@ public static class GitPullRequestExtensions
 {
     /// <summary>Property key to identify bot-created threads.</summary>
     private const string BotProperty = "ai-bot";
-    
+
     /// <summary>Property key to store issue fingerprints for tracking across iterations.</summary>
     private const string FingerprintProperty = "fingerprint";
-    
+
     /// <summary>Property key to store the iteration ID when the thread was created.</summary>
     private const string IterationIdProperty = "iteration-id";
-    
+
     /// <summary>Identifier for the special state tracking thread.</summary>
     private const string StateThreadIdentifier = "ai-state";
 

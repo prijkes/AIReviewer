@@ -48,7 +48,7 @@ public sealed class ContextEnricher(ILogger<ContextEnricher> logger, LocalGitPro
                     if (match.Success && int.TryParse(match.Groups[1].Value, out var lineNum))
                     {
                         currentLine = lineNum - 1; // 0-based index
-                        
+
                         // Add context before the change
                         var contextStart = Math.Max(0, currentLine - contextLines);
                         if (contextStart < currentLine)
@@ -73,10 +73,10 @@ public sealed class ContextEnricher(ILogger<ContextEnricher> logger, LocalGitPro
             }
 
             var result = enriched.ToString();
-            
+
             if (result.Length > diff.DiffText.Length)
             {
-                logger.LogDebug("Enriched diff for {Path} (+{ExtraBytes} bytes of context)", 
+                logger.LogDebug("Enriched diff for {Path} (+{ExtraBytes} bytes of context)",
                     diff.Path, result.Length - diff.DiffText.Length);
             }
 
@@ -92,7 +92,7 @@ public sealed class ContextEnricher(ILogger<ContextEnricher> logger, LocalGitPro
     /// <summary>
     /// Analyzes the diff to extract key information like affected methods, classes, etc.
     /// </summary>
-    public DiffAnalysis AnalyzeDiff(ReviewFileDiff diff)
+    public static DiffAnalysis AnalyzeDiff(ReviewFileDiff diff)
     {
         var analysis = new DiffAnalysis();
         var lines = diff.DiffText.Split('\n');
@@ -134,7 +134,7 @@ public sealed class ContextEnricher(ILogger<ContextEnricher> logger, LocalGitPro
     /// <summary>
     /// Generates a summary of the changes for inclusion in the review prompt.
     /// </summary>
-    public string GenerateChangeSummary(DiffAnalysis analysis)
+    public static string GenerateChangeSummary(DiffAnalysis analysis)
     {
         var summary = new StringBuilder();
         summary.AppendLine("Change Summary:");

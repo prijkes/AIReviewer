@@ -25,7 +25,7 @@ public sealed class CircuitBreakerPolicyFactory(ILogger<CircuitBreakerPolicyFact
                 BreakDuration = TimeSpan.FromSeconds(30),
                 OnOpened = args =>
                 {
-                    logger.LogWarning("Circuit breaker opened due to failures. Blocking AI API calls for {Duration}s", 
+                    logger.LogWarning("Circuit breaker opened due to failures. Blocking AI API calls for {Duration}s",
                         args.BreakDuration.TotalSeconds);
                     return ValueTask.CompletedTask;
                 },
@@ -58,7 +58,7 @@ public sealed class CircuitBreakerPolicyFactory(ILogger<CircuitBreakerPolicyFact
                 BreakDuration = TimeSpan.FromSeconds(60),
                 OnOpened = args =>
                 {
-                    logger.LogWarning("Circuit breaker opened for Azure DevOps API. Blocking calls for {Duration}s", 
+                    logger.LogWarning("Circuit breaker opened for Azure DevOps API. Blocking calls for {Duration}s",
                         args.BreakDuration.TotalSeconds);
                     return ValueTask.CompletedTask;
                 },

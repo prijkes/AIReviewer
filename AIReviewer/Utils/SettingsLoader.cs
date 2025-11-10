@@ -32,7 +32,7 @@ public static class SettingsLoader
 
         // Build configuration from INI file
         IConfiguration config;
-        
+
         try
         {
             config = new ConfigurationBuilder()
@@ -46,7 +46,7 @@ public static class SettingsLoader
 
         // Create options instance
         var options = new ReviewerOptions();
-        
+
         try
         {
             // Automatically bind all INI sections to the options object!
@@ -59,15 +59,15 @@ public static class SettingsLoader
             // - Automatically parse all primitive types (int, double, bool, string)
             // - Automatically use TypeConverter for Size types
             config.Bind(options);
-            
+
             logger?.LogInformation("Successfully loaded static settings from {IniPath}", iniPath);
-            
+
             // Log parsed size values for debugging
-            logger?.LogDebug("Parsed Files:MaxFileBytes = {Value} ({Bytes} bytes)", 
+            logger?.LogDebug("Parsed Files:MaxFileBytes = {Value} ({Bytes} bytes)",
                 config["Files:MaxFileBytes"], options.Files.MaxFileBytes.Bytes);
-            logger?.LogDebug("Parsed Files:MaxDiffBytes = {Value} ({Bytes} bytes)", 
+            logger?.LogDebug("Parsed Files:MaxDiffBytes = {Value} ({Bytes} bytes)",
                 config["Files:MaxDiffBytes"], options.Files.MaxDiffBytes.Bytes);
-            logger?.LogDebug("Parsed Files:MaxPromptDiffBytes = {Value} ({Bytes} bytes)", 
+            logger?.LogDebug("Parsed Files:MaxPromptDiffBytes = {Value} ({Bytes} bytes)",
                 config["Files:MaxPromptDiffBytes"], options.Files.MaxPromptDiffBytes.Bytes);
         }
         catch (Exception ex)
@@ -76,10 +76,10 @@ public static class SettingsLoader
                 $"Failed to bind settings.ini to configuration objects: {ex.Message}\n" +
                 "Ensure all required values are present and in the correct format.", ex);
         }
-        
+
         // Load required dynamic values from environment
         LoadDynamicFromEnvironment(options, logger);
-        
+
         return options;
     }
 
@@ -90,21 +90,21 @@ public static class SettingsLoader
     private static void LoadDynamicFromEnvironment(ReviewerOptions options, ILogger? logger)
     {
         logger?.LogDebug("Loading dynamic configuration from environment variables...");
-        
+
         // Azure DevOps (required)
         options.AdoCollectionUrl = GetRequiredEnvVar("ADO_COLLECTION_URL", logger);
         options.AdoProject = GetRequiredEnvVar("ADO_PROJECT", logger);
         options.AdoAccessToken = GetRequiredEnvVar("ADO_ACCESS_TOKEN", logger);
-        
+
         // Repo (one of these required)
         options.AdoRepoName = Environment.GetEnvironmentVariable("ADO_REPO_NAME");
         options.AdoRepoId = Environment.GetEnvironmentVariable("ADO_REPO_ID");
-        
+
         if (string.IsNullOrWhiteSpace(options.AdoRepoName) && string.IsNullOrWhiteSpace(options.AdoRepoId))
         {
             throw new InvalidOperationException("Either ADO_REPO_NAME or ADO_REPO_ID environment variable must be set.");
         }
-        
+
         // PR ID (optional - can be inferred)
         var prIdStr = Environment.GetEnvironmentVariable("ADO_PR_ID");
         if (!string.IsNullOrWhiteSpace(prIdStr) && int.TryParse(prIdStr, out var prId))
@@ -112,17 +112,17 @@ public static class SettingsLoader
             options.AdoPullRequestId = prId;
             logger?.LogDebug("Loaded ADO_PR_ID = {PrId}", prId);
         }
-        
+
         // Build source version (optional)
         options.BuildSourceVersion = Environment.GetEnvironmentVariable("BUILD_SOURCE_VERSION");
-        
+
         // Azure AI (required)
         options.AiFoundryEndpoint = GetRequiredEnvVar("AI_FOUNDRY_ENDPOINT", logger);
         options.AiFoundryApiKey = GetRequiredEnvVar("AI_FOUNDRY_API_KEY", logger);
-        
+
         // Local repo path (required)
         options.LocalRepoPath = GetRequiredEnvVar("LOCAL_REPO_PATH", logger);
-        
+
         logger?.LogInformation("Successfully loaded dynamic configuration from environment variables");
     }
 
@@ -138,7 +138,7 @@ public static class SettingsLoader
                 $"Required environment variable not set: {name}\n" +
                 "See PIPELINE.md for required environment variables.");
         }
-        
+
         logger?.LogDebug("Loaded {VarName} from environment", name);
         return value;
     }

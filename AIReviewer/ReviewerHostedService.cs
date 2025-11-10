@@ -40,23 +40,23 @@ public sealed class ReviewerHostedService(
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            logger.LogInformation("Starting AI PR review (DryRun: {DryRun}, OnlyReviewIfRequiredReviewer: {OnlyReviewIfRequiredReviewer})", 
+            logger.LogInformation("Starting AI PR review (DryRun: {DryRun}, OnlyReviewIfRequiredReviewer: {OnlyReviewIfRequiredReviewer})",
                 _options.DryRun, _options.OnlyReviewIfRequiredReviewer);
-            
+
             var pr = await adoClient.GetPullRequestContextAsync(cancellationToken);
-            
+
             // Check if bot must be a required reviewer
             if (_options.OnlyReviewIfRequiredReviewer)
             {
                 var currentIdentity = adoClient.GetAuthorizedIdentity();
                 var reviewers = await adoClient.Git.GetPullRequestReviewersAsync(
-                    pr.Repository.Id, 
-                    pr.PullRequest.PullRequestId, 
+                    pr.Repository.Id,
+                    pr.PullRequest.PullRequestId,
                     cancellationToken: cancellationToken);
-                
+
                 var botReviewer = reviewers.FirstOrDefault(r => r.UniqueName == currentIdentity.UniqueName);
                 var isRequiredReviewer = botReviewer?.IsRequired ?? false;
-                
+
                 if (!isRequiredReviewer)
                 {
                     logger.LogInformation(
@@ -64,10 +64,10 @@ public sealed class ReviewerHostedService(
                         currentIdentity.UniqueName);
                     return;
                 }
-                
+
                 logger.LogInformation("Bot user '{BotUser}' is a required reviewer, proceeding with review", currentIdentity.UniqueName);
             }
-            
+
             logger.LogInformation(
                 "Loaded PR {Id} - {Title} [{Source} -> {Target}]",
                 pr.PullRequest.PullRequestId,
@@ -76,12 +76,13 @@ public sealed class ReviewerHostedService(
                 pr.PullRequest.TargetRefName);
 
             var iteration = pr.LatestIteration;
-            
+
             // Check if this iteration has already been reviewed
             var threads = await adoClient.Git.GetThreadsAsync(pr.Repository.Id, pr.PullRequest.PullRequestId, cancellationToken: cancellationToken);
-            var botThreads = threads.Where(t => t.IsCreatedByBot()).ToList();
+            var existingThreads = threads.Where(t => !t.IsDeleted).ToList();
+            var botThreads = existingThreads.Where(t => t.IsCreatedByBot()).ToList();
             var lastReviewedIteration = await commentService.GetLastReviewedIterationAsync(botThreads);
-            
+
             if (lastReviewedIteration.HasValue && lastReviewedIteration.Value == iteration.Id)
             {
                 logger.LogInformation(
@@ -89,20 +90,20 @@ public sealed class ReviewerHostedService(
                     iteration.Id, lastReviewedIteration.Value);
                 return;
             }
-            
-            logger.LogInformation("Reviewing iteration {IterationId} (last reviewed: {LastReviewed})", 
+
+            logger.LogInformation("Reviewing iteration {IterationId} (last reviewed: {LastReviewed})",
                 iteration.Id, lastReviewedIteration?.ToString() ?? "none");
-            
+
             var diffs = await diffService.GetDiffsAsync(pr, iteration, cancellationToken);
-            
+
             logger.LogInformation("PR has {CommitCount} commits, {FileCount} files to review", pr.Commits.Length, diffs.Count);
 
             // ReviewPlanner will load language-specific policies internally
-            var reviewResult = await planner.PlanAsync(pr, iteration, diffs, _options.PolicyPath, cancellationToken);
+            var reviewResult = await planner.PlanAsync(pr, iteration, diffs, existingThreads, _options.PolicyPath, cancellationToken);
 
             if (!_options.DryRun)
             {
-                await commentService.ApplyReviewAsync(pr, iteration, reviewResult, cancellationToken);
+                await commentService.ApplyReviewAsync(pr, iteration, reviewResult, botThreads, cancellationToken);
                 await approvalService.ApplyApprovalAsync(pr, reviewResult, cancellationToken);
             }
             else

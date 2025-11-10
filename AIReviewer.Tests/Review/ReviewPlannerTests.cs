@@ -34,7 +34,7 @@ public class ReviewPlannerTests
             Mock.Of<ILogger<PolicyLoader>>(),
             Mock.Of<IOptionsMonitor<ReviewerOptions>>());
         _optionsMock = new Mock<IOptionsMonitor<ReviewerOptions>>();
-        
+
         _options = new ReviewerOptions
         {
             MaxFilesToReview = 50,
@@ -43,9 +43,9 @@ public class ReviewPlannerTests
             WarnBudget = 3,
             JapaneseDetectionThreshold = 0.3
         };
-        
+
         _optionsMock.Setup(x => x.CurrentValue).Returns(_options);
-        
+
         // Setup policy loader to return a test policy
         _policyLoaderMock
             .Setup(x => x.LoadAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -53,7 +53,7 @@ public class ReviewPlannerTests
         _policyLoaderMock
             .Setup(x => x.LoadLanguageSpecificAsync(It.IsAny<string>(), It.IsAny<ProgrammingLanguageDetector.ProgrammingLanguage>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("Test policy");
-        
+
         // Setup ADO client to return empty comments list
         _adoClientMock
             .Setup(x => x.GetExistingCommentsAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -93,7 +93,7 @@ public class ReviewPlannerTests
             .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
-        var result = await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);
+        var result = await planner.PlanAsync(pr, iteration, diffs, [], policy, CancellationToken.None);
 
         // Assert
         result.ShouldApprove.Should().BeTrue();
@@ -128,7 +128,7 @@ public class ReviewPlannerTests
             .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
-        var result = await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);
+        var result = await planner.PlanAsync(pr, iteration, diffs, [], policy, CancellationToken.None);
 
         // Assert
         result.ShouldApprove.Should().BeFalse();
@@ -164,7 +164,7 @@ public class ReviewPlannerTests
             .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
-        var result = await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);
+        var result = await planner.PlanAsync(pr, iteration, diffs, [], policy, CancellationToken.None);
 
         // Assert (WarnBudget = 3, we have 2 warnings)
         result.ShouldApprove.Should().BeTrue();
@@ -202,7 +202,7 @@ public class ReviewPlannerTests
             .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
-        var result = await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);
+        var result = await planner.PlanAsync(pr, iteration, diffs, [], policy, CancellationToken.None);
 
         // Assert (WarnBudget = 3, we have 4 warnings)
         result.ShouldApprove.Should().BeFalse();
@@ -231,7 +231,7 @@ public class ReviewPlannerTests
             .ReturnsAsync(new AiReviewResponse([]));
 
         // Act
-        await planner.PlanAsync(pr, iteration, diffs, policy, CancellationToken.None);
+        await planner.PlanAsync(pr, iteration, diffs, [], policy, CancellationToken.None);
 
         // Assert - Should only review MaxFilesToReview (50) files
         _aiClientMock.Verify(

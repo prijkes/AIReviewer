@@ -31,8 +31,8 @@ public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
     /// <param name="retryFactory">Factory for creating retry policies.</param>
     /// <param name="localGitProviderLogger">Logger for LocalGitProvider.</param>
     public AdoSdkClient(
-        ILogger<AdoSdkClient> logger, 
-        IOptionsMonitor<ReviewerOptions> options, 
+        ILogger<AdoSdkClient> logger,
+        IOptionsMonitor<ReviewerOptions> options,
         RetryPolicyFactory retryFactory,
         ILogger<LocalGitProvider> localGitProviderLogger)
     {
@@ -197,7 +197,7 @@ public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
     public async Task<GitItem?> GetFileContentAsync(string filePath, string versionDescriptor)
     {
         _logger.LogDebug("Getting file content from local repository: {FilePath}", filePath);
-        
+
         var content = await _localGitProvider.GetFileContentAsync(filePath, versionDescriptor)
             ?? throw new InvalidOperationException(
                 $"File not found in local repository: {filePath} at {versionDescriptor}");
@@ -242,7 +242,7 @@ public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
     {
         _logger.LogDebug("Getting file history from local repository for: {FilePath}", filePath);
         var history = await _localGitProvider.GetFileHistoryAsync(filePath, versionDescriptor, maxCommits);
-        
+
         // Convert string history to GitCommitRef for compatibility
         return [.. history.Select(h => new GitCommitRef { Comment = h })];
     }
@@ -261,9 +261,9 @@ public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
         string targetCommit,
         CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Getting file diff from local repository for: {FilePath} ({Base}..{Target})", 
+        _logger.LogDebug("Getting file diff from local repository for: {FilePath} ({Base}..{Target})",
             filePath, baseCommit[..Math.Min(8, baseCommit.Length)], targetCommit[..Math.Min(8, targetCommit.Length)]);
-        
+
         return await _localGitProvider.GetFileDiffAsync(filePath, baseCommit, targetCommit);
     }
 
@@ -283,10 +283,91 @@ public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
         CancellationToken cancellationToken)
     {
         var retry = _retryFactory.CreateHttpRetryPolicy(nameof(GitHttpClient));
-        
-        var threads = await retry.ExecuteAsync(() => 
+
+        var threads = await retry.ExecuteAsync(() =>
             _gitClient.GetThreadsAsync(repoId, prId, cancellationToken: cancellationToken));
 
+        return ProcessExistingComments(threads, filePath);
+    }
+
+    /// <summary>
+    /// Processes pre-fetched threads into existing comments grouped by file.
+    /// This avoids re-fetching threads for each file during parallel reviews.
+    /// </summary>
+    /// <param name="threads">The pre-fetched threads.</param>
+    /// <returns>Dictionary mapping file paths to their existing comments.</returns>
+    public Dictionary<string, List<ExistingComment>> GetExistingCommentsFromThreads(List<GitPullRequestCommentThread> threads)
+    {
+        var commentsByFile = new Dictionary<string, List<ExistingComment>>();
+        var botIdentity = GetAuthorizedIdentity();
+
+        foreach (var thread in threads)
+        {
+            // Skip if this is a bot's own thread (we're looking for external feedback)
+            if (thread.IsCreatedByBot())
+            {
+                continue;
+            }
+
+            // Skip threads with no file context (PR-level comments)
+            var threadFilePath = thread.ThreadContext?.FilePath;
+            if (string.IsNullOrWhiteSpace(threadFilePath))
+            {
+                continue;
+            }
+
+            // Get the line number if available
+            int? lineNumber = thread.ThreadContext?.RightFileStart?.Line;
+
+            // Extract comments from the thread
+            foreach (var comment in thread.Comments ?? [])
+            {
+                // Skip system comments
+                if (comment.CommentType != Microsoft.TeamFoundation.SourceControl.WebApi.CommentType.Text)
+                {
+                    continue;
+                }
+
+                // Skip empty comments
+                if (string.IsNullOrWhiteSpace(comment.Content))
+                {
+                    continue;
+                }
+
+                var author = comment.Author?.DisplayName ?? "Unknown";
+
+                // Skip bot's own comments (in case thread wasn't marked)
+                if (comment.Author?.Id == botIdentity.Id)
+                {
+                    continue;
+                }
+
+                if (!commentsByFile.ContainsKey(threadFilePath))
+                {
+                    commentsByFile[threadFilePath] = [];
+                }
+
+                commentsByFile[threadFilePath].Add(new ExistingComment(
+                    Author: author,
+                    Content: comment.Content,
+                    FilePath: threadFilePath,
+                    LineNumber: lineNumber,
+                    ThreadStatus: thread.Status.ToString()
+                ));
+            }
+        }
+
+        _logger.LogDebug("Processed {ThreadCount} threads into comments for {FileCount} files",
+            threads.Count, commentsByFile.Count);
+
+        return commentsByFile;
+    }
+
+    /// <summary>
+    /// Helper method to process threads into existing comments, optionally filtered by file path.
+    /// </summary>
+    private List<ExistingComment> ProcessExistingComments(List<GitPullRequestCommentThread> threads, string? filePath)
+    {
         var existingComments = new List<ExistingComment>();
         var botIdentity = GetAuthorizedIdentity();
 
@@ -330,7 +411,7 @@ public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
                 }
 
                 var author = comment.Author?.DisplayName ?? "Unknown";
-                
+
                 // Skip bot's own comments (in case thread wasn't marked)
                 if (comment.Author?.Id == botIdentity.Id)
                 {
@@ -347,7 +428,7 @@ public sealed class AdoSdkClient : IAdoSdkClient, IDisposable
             }
         }
 
-        _logger.LogDebug("Retrieved {Count} existing comments for file: {FilePath}", 
+        _logger.LogDebug("Retrieved {Count} existing comments for file: {FilePath}",
             existingComments.Count, filePath ?? "all files");
 
         return existingComments;
