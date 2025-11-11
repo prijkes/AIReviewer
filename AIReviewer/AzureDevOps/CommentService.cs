@@ -69,8 +69,8 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
 
         foreach (var issue in result.Issues)
         {
-            logger.LogInformation("[THREAD-MATCHING] Processing issue with fingerprint={Fingerprint} for {FilePath}:{Line}",
-                issue.Fingerprint, issue.FilePath, issue.Line);
+            logger.LogInformation("[THREAD-MATCHING] Processing issue with fingerprint={Fingerprint} for {FilePath}",
+                issue.Fingerprint, issue.FilePath);
 
             var existing = botThreads.FirstOrDefault(t => t.GetFingerprint() == issue.Fingerprint);
             if (existing != null)
@@ -103,16 +103,42 @@ public sealed class CommentService(ILogger<CommentService> logger, IAdoSdkClient
     /// <returns>A task representing the asynchronous operation.</returns>
     private async Task CreateThreadAsync(PullRequestContext pr, ReviewIssue issue, int iterationId, CancellationToken cancellationToken)
     {
+        // For PR metadata comments (e.g., PR description issues), there's no file path
+        var hasFile = !string.IsNullOrEmpty(issue.FilePath);
+        
+        // Log the issue details for debugging
+        logger.LogInformation("[COMMENT-DEBUG] Creating thread for issue: FilePath={FilePath}, LineStart={LineStart}, StartOffset={StartOffset} LineEnd={LineEnd} EndOffset={EndOffset}, IsDeleted={IsDeleted}, HasFile={HasFile}", 
+            issue.FilePath, issue.LineStart, issue.LineStartOffset, issue.LineEnd, issue.LineEndOffset, issue.IsDeleted, hasFile);
+        
         var thread = new GitPullRequestCommentThread
         {
-            ThreadContext = new CommentThreadContext
+            ThreadContext = hasFile ? new CommentThreadContext
             {
-                FilePath = issue.FilePath,
+                // Ensure file path starts with / for Azure DevOps to properly locate it in Files tab
+                FilePath = issue.FilePath.StartsWith('/') ? issue.FilePath : $"/{issue.FilePath}",
                 // For deleted files, position comment on left side (original content)
                 // For added/modified files, position comment on right side (new content)
-                LeftFileStart = issue.IsDeleted && issue.Line > 0 ? new CommentPosition { Line = issue.Line, Offset = 1 } : null,
-                RightFileStart = !issue.IsDeleted && issue.Line > 0 ? new CommentPosition { Line = issue.Line, Offset = 1 } : null
-            },
+                // Both Start and End are required for comments to appear in Files tab
+                // Use actual file line numbers from the AI (not diff line numbers)
+                // Note: Azure DevOps requires offset >= 1 (1-based indexing), so we use Math.Max(1, offset)
+                LeftFileStart = issue.IsDeleted && issue.LineStart > 0 ? new CommentPosition { Line = issue.LineStart, Offset = Math.Max(1, issue.LineStartOffset) } : null,
+                LeftFileEnd = issue.IsDeleted && issue.LineEnd > 0 ? new CommentPosition { Line = issue.LineEnd, Offset = Math.Max(1, issue.LineEndOffset) } : null,
+                RightFileStart = !issue.IsDeleted && issue.LineStart > 0 ? new CommentPosition { Line = issue.LineStart, Offset = Math.Max(1, issue.LineStartOffset) } : null,
+                RightFileEnd = !issue.IsDeleted && issue.LineEnd > 0 ? new CommentPosition { Line = issue.LineEnd, Offset = Math.Max(1, issue.LineEndOffset) } : null
+            } : null,
+            PullRequestThreadContext = hasFile ? new GitPullRequestCommentThreadContext
+            {
+                // Set iteration context to track comments across PR iterations
+                IterationContext = new CommentIterationContext
+                {
+                    // Compare from base iteration (1) to current iteration
+                    FirstComparingIteration = 1,
+                    SecondComparingIteration = (short)iterationId
+                },
+                // ChangeTrackingId is used to track the comment position across iterations
+                // We use 1 as a default since we're creating a new thread
+                ChangeTrackingId = 1
+            } : null,
             Comments =
             [
                 new Comment

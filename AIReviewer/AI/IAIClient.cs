@@ -42,22 +42,26 @@ public sealed record AiReviewResponse(IReadOnlyList<AiIssue> Issues);
 /// <summary>
 /// Represents a single issue identified during AI code review.
 /// </summary>
-/// <param name="Id">Unique identifier for the issue.</param>
 /// <param name="Title">Brief title describing the issue.</param>
 /// <param name="Severity">Severity level of the issue.</param>
 /// <param name="Category">Category classification of the issue.</param>
 /// <param name="File">File path where the issue was found.</param>
-/// <param name="Line">Line number where the issue occurs.</param>
+/// <param name="FileLineStart">Starting line number in the actual file where the issue begins.</param>
+/// <param name="FileLineStartOffset">Character offset within the starting line where the issue begins (0-based).</param>
+/// <param name="FileLineEnd">Ending line number in the actual file where the issue ends.</param>
+/// <param name="FileLineEndOffset">Character offset within the ending line where the issue ends (0-based).</param>
 /// <param name="Rationale">Explanation of why this is an issue.</param>
 /// <param name="Recommendation">Suggested fix or improvement.</param>
 /// <param name="FixExample">Optional code example showing how to fix the issue.</param>
 public sealed record AiIssue(
-    string Id,
     string Title,
     IssueSeverity Severity,
     IssueCategory Category,
     string File,
-    int Line,
+    int FileLineStart,
+    int FileLineStartOffset,
+    int FileLineEnd,
+    int FileLineEndOffset,
     string Rationale,
     string Recommendation,
     string? FixExample);

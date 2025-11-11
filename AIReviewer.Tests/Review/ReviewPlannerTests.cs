@@ -121,7 +121,7 @@ public class ReviewPlannerTests
 
         var issues = new List<AiIssue>
         {
-            new("E1", "Error 1", IssueSeverity.Error, IssueCategory.Security, "test.cs", 10, "Rationale", "Fix it", null)
+            new("Error 1", IssueSeverity.Error, IssueCategory.Security, "test.cs", 10, 0, 10, 0, "Rationale", "Fix it", null)
         };
 
         _aiClientMock
@@ -156,8 +156,8 @@ public class ReviewPlannerTests
 
         var issues = new List<AiIssue>
         {
-            new("W1", "Warning 1", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 10, "Rationale", "Fix it", null),
-            new("W2", "Warning 2", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 20, "Rationale", "Fix it", null)
+            new("Warning 1", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 10, 0, 10, 0, "Rationale", "Fix it", null),
+            new("Warning 2", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 20, 0, 20, 0, "Rationale", "Fix it", null)
         };
 
         _aiClientMock
@@ -192,10 +192,10 @@ public class ReviewPlannerTests
 
         var issues = new List<AiIssue>
         {
-            new("W1", "Warning 1", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 10, "Rationale", "Fix it", null),
-            new("W2", "Warning 2", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 20, "Rationale", "Fix it", null),
-            new("W3", "Warning 3", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 30, "Rationale", "Fix it", null),
-            new("W4", "Warning 4", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 40, "Rationale", "Fix it", null)
+            new("Warning 1", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 10, 0, 10, 0, "Rationale", "Fix it", null),
+            new("Warning 2", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 20, 0, 20, 0, "Rationale", "Fix it", null),
+            new("Warning 3", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 30, 0, 30, 0, "Rationale", "Fix it", null),
+            new("Warning 4", IssueSeverity.Warn, IssueCategory.Style, "test.cs", 40, 0, 40, 0, "Rationale", "Fix it", null)
         };
 
         _aiClientMock
@@ -259,7 +259,7 @@ public class ReviewPlannerTests
 
         var issues = new List<AiIssue>
         {
-            new("W1", "Warning 1", IssueSeverity.Warn, IssueCategory.Style, "deleted.cs", 10, "Rationale", "Fix it", null)
+            new("Warning 1", IssueSeverity.Warn, IssueCategory.Style, "deleted.cs", 10, 0, 10, 0, "Rationale", "Fix it", null)
         };
 
         _aiClientMock

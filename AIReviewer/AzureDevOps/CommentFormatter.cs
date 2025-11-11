@@ -60,10 +60,11 @@ public static class CommentFormatter
         {
             fingerprints = result.Issues.Select(i => new
             {
+                iteration = result.Iteration,
                 i.Fingerprint,
                 i.FilePath,
-                i.Line,
-                i.Severity
+                i.LineStart,
+                i.LineEnd
             }).ToArray(),
             updatedAt = DateTimeOffset.UtcNow
         };

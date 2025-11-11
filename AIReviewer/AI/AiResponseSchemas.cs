@@ -22,13 +22,6 @@ internal sealed record AiEnvelopeSchema(
 /// </summary>
 internal sealed record AiIssueSchema(
     /// <summary>
-    /// Unique identifier for the issue (e.g., "PERF-001", "SEC-002").
-    /// </summary>
-    [property: JsonPropertyName("id")]
-    [property: JsonRequired]
-    string Id,
-
-    /// <summary>
     /// Brief, descriptive title summarizing the issue.
     /// </summary>
     [property: JsonPropertyName("title")]
@@ -57,11 +50,32 @@ internal sealed record AiIssueSchema(
     string File,
 
     /// <summary>
-    /// Line number where the issue occurs (1-based indexing).
+    /// Starting line number in the ACTUAL FILE (not the diff) where the issue begins. Use 1-based indexing. This represents the line number as it appears in the complete source file.
     /// </summary>
-    [property: JsonPropertyName("line")]
+    [property: JsonPropertyName("file_line_start")]
     [property: JsonRequired]
-    int Line,
+    int FileLineStart,
+
+    /// <summary>
+    /// Character offset within the starting line where the issue begins. Use 0-based indexing. Starts at 0 for the first character of the line.
+    /// </summary>
+    [property: JsonPropertyName("file_line_start_offset")]
+    [property: JsonRequired]
+    int FileLineStartOffset,
+
+    /// <summary>
+    /// Ending line number in the ACTUAL FILE (not the diff) where the issue ends. Use 1-based indexing. For single-line issues, this should equal file_line_start. For multi-line issues, this should be the last line of the problematic code.
+    /// </summary>
+    [property: JsonPropertyName("file_line_end")]
+    [property: JsonRequired]
+    int FileLineEnd,
+
+    /// <summary>
+    /// Character offset within the ending line where the issue ends. Use 0-based indexing. For single-character issues, this should be file_line_start_offset + 1.
+    /// </summary>
+    [property: JsonPropertyName("file_line_end_offset")]
+    [property: JsonRequired]
+    int FileLineEndOffset,
 
     /// <summary>
     /// Detailed explanation of why this is an issue and its potential impact.

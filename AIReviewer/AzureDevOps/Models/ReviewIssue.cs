@@ -37,8 +37,6 @@ public enum IssueCategory
 /// </summary>
 public sealed class ReviewIssue
 {
-    /// <summary>Unique identifier for the issue.</summary>
-    public string Id { get; init; } = string.Empty;
     /// <summary>Brief title describing the issue.</summary>
     public string Title { get; init; } = string.Empty;
     /// <summary>Severity level of the issue.</summary>
@@ -47,8 +45,14 @@ public sealed class ReviewIssue
     public IssueCategory Category { get; init; }
     /// <summary>File path where the issue was found.</summary>
     public string FilePath { get; init; } = string.Empty;
-    /// <summary>Line number where the issue occurs (0 for file-level issues).</summary>
-    public int Line { get; init; }
+    /// <summary>Starting line number in the actual file where the issue begins (0 for file-level issues).</summary>
+    public int LineStart { get; init; }
+    /// <summary>Character offset within the starting line where the issue begins (0-based indexing).</summary>
+    public int LineStartOffset { get; init; }
+    /// <summary>Ending line number in the actual file where the issue ends (0 for file-level issues).</summary>
+    public int LineEnd { get; init; }
+    /// <summary>Character offset within the ending line where the issue ends (0-based indexing).</summary>
+    public int LineEndOffset { get; init; }
     /// <summary>Explanation of why this is an issue.</summary>
     public string Rationale { get; init; } = string.Empty;
     /// <summary>Suggested fix or improvement.</summary>

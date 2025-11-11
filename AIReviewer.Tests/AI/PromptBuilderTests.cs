@@ -176,4 +176,62 @@ public class PromptBuilderTests
         result.Should().NotContain("Commit 6");
         result.Should().NotContain("Commit 10");
     }
+
+    [Fact]
+    public async Task BuildFileReviewUserPrompt_WithDeletedFile_ShouldIncludeDeletedFileNotice()
+    {
+        // Arrange
+        var diff = new ReviewFileDiff("deleted.cs", "diff content", "hash123", false, true);
+        var existingComments = new List<ExistingComment>();
+
+        // Act
+        var result = await _promptBuilder.BuildFileReviewUserPromptAsync(diff, existingComments, CancellationToken.None);
+
+        // Assert
+        result.Should().Contain("deleted.cs");
+        result.Should().Contain("FILE STATUS: This file has been DELETED");
+        result.Should().Contain("use the line numbers from the ORIGINAL file");
+        result.Should().Contain("shown with '-' prefix in the diff");
+        result.Should().Contain("HOW TO COUNT LINE NUMBERS IN THIS DIFF:");
+        result.Should().Contain("FIRST line with '-' after the '@@' header is the starting line number");
+        result.Should().Contain("@@ -1,115 +0,0 @@");
+        result.Should().Contain("-# azure-pipelines.yml     <- This is line 1 of the original file");
+    }
+
+    [Fact]
+    public async Task BuildFileReviewUserPrompt_WithNonDeletedFile_ShouldNotIncludeDeletedFileNotice()
+    {
+        // Arrange
+        var diff = new ReviewFileDiff("modified.cs", "diff content", "hash123", false, false);
+        var existingComments = new List<ExistingComment>();
+
+        // Act
+        var result = await _promptBuilder.BuildFileReviewUserPromptAsync(diff, existingComments, CancellationToken.None);
+
+        // Assert
+        result.Should().Contain("modified.cs");
+        result.Should().NotContain("FILE STATUS: This file has been DELETED");
+        result.Should().NotContain("ORIGINAL file");
+    }
+
+    [Fact]
+    public async Task BuildFileReviewUserPrompt_WithExistingComments_ShouldIncludeExistingCommentsSection()
+    {
+        // Arrange
+        var diff = new ReviewFileDiff("test.cs", "diff content", "hash123", false, false);
+        var existingComments = new List<ExistingComment>
+        {
+            new("Alice", "Missing null check", "test.cs", 42, "Active"),
+            new("Bob", "Consider using async", "test.cs", null, "Active")
+        };
+
+        // Act
+        var result = await _promptBuilder.BuildFileReviewUserPromptAsync(diff, existingComments, CancellationToken.None);
+
+        // Assert
+        result.Should().Contain("Existing Comments on this file:");
+        result.Should().Contain("[Alice] (Line 42): Missing null check");
+        result.Should().Contain("[Bob]: Consider using async");
+        result.Should().Contain("Do NOT create issues that duplicate or overlap");
+    }
 }

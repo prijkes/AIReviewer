@@ -42,12 +42,14 @@ public class AiResponseSchemaGeneratorTests
         }
 
         // Verify all critical fields are in the required array
-        Assert.Contains("id", requiredFields);
         Assert.Contains("title", requiredFields);
         Assert.Contains("severity", requiredFields);
         Assert.Contains("category", requiredFields);
         Assert.Contains("file", requiredFields);
-        Assert.Contains("line", requiredFields);
+        Assert.Contains("file_line_start", requiredFields);
+        Assert.Contains("file_line_start_offset", requiredFields);
+        Assert.Contains("file_line_end", requiredFields);
+        Assert.Contains("file_line_end_offset", requiredFields);
         Assert.Contains("rationale", requiredFields);
         Assert.Contains("recommendation", requiredFields);
         Assert.Contains("fix_example", requiredFields);

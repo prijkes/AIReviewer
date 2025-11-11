@@ -65,11 +65,12 @@ public sealed class PromptBuilder(ILogger<PromptBuilder> logger, IOptionsMonitor
         var commentsSection = existingComments.Count > 0
             ? FormatExistingComments(existingComments)
             : string.Empty;
-
         return $"""
             File: {fileDiff.Path}
             Unified Diff:
+            ```diff
             {truncatedDiff}
+            ```
             {commentsSection}
             {instructions}
             """;

@@ -16,7 +16,8 @@ public class CommentFormatterTests
             Severity = IssueSeverity.Error,
             Category = IssueCategory.Security,
             FilePath = "test.cs",
-            Line = 10,
+            LineStart = 10,
+            LineEnd = 10,
             Rationale = "This is a security issue",
             Recommendation = "Use SecureString instead",
             FixExample = null,
@@ -44,7 +45,8 @@ public class CommentFormatterTests
             Severity = IssueSeverity.Warn,
             Category = IssueCategory.Performance,
             FilePath = "test.cs",
-            Line = 15,
+            LineStart = 15,
+            LineEnd = 15,
             Rationale = "Should use secure string",
             Recommendation = "Update the code",
             FixExample = fixExample,
@@ -70,7 +72,8 @@ public class CommentFormatterTests
             Severity = IssueSeverity.Info,
             Category = IssueCategory.Style,
             FilePath = "test.cs",
-            Line = 20,
+            LineStart = 20,
+            LineEnd = 20,
             Rationale = "Consider improving naming",
             Recommendation = "Use more descriptive names",
             FixExample = null,
@@ -94,7 +97,8 @@ public class CommentFormatterTests
             Severity = IssueSeverity.Error,
             Category = IssueCategory.Correctness,
             FilePath = "file.cs",
-            Line = 1,
+            LineStart = 1,
+            LineEnd = 1,
             Rationale = "Rationale",
             Recommendation = "Recommendation",
             FixExample = null,
@@ -119,7 +123,8 @@ public class CommentFormatterTests
             Severity = IssueSeverity.Warn,
             Category = IssueCategory.Performance,
             FilePath = "perf.cs",
-            Line = 5,
+            LineStart = 5,
+            LineEnd = 5,
             Rationale = "This could be optimized",
             Recommendation = "Use async/await",
             FixExample = null,
@@ -143,7 +148,8 @@ public class CommentFormatterTests
             Severity = IssueSeverity.Info,
             Category = IssueCategory.Docs,
             FilePath = "doc.cs",
-            Line = 30,
+            LineStart = 30,
+            LineEnd = 30,
             Rationale = "Add documentation",
             Recommendation = "Add XML comments",
             FixExample = null,
@@ -167,7 +173,8 @@ public class CommentFormatterTests
             Severity = IssueSeverity.Error,
             Category = IssueCategory.Security,
             FilePath = "test.cs",
-            Line = 10,
+            LineStart = 10,
+            LineEnd = 10,
             Rationale = "Security problem",
             Recommendation = "Fix it",
             FixExample = null,
@@ -189,10 +196,10 @@ public class CommentFormatterTests
         // Arrange
         var issues = new List<ReviewIssue>
         {
-            new() { Title = "Issue 1", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file1.cs", Line = 10, Rationale = "R1", Recommendation = "Rec1", Fingerprint = "fp1" },
-            new() { Title = "Issue 2", Severity = IssueSeverity.Warn, Category = IssueCategory.Style, FilePath = "file2.cs", Line = 20, Rationale = "R2", Recommendation = "Rec2", Fingerprint = "fp2" }
+            new() { Title = "Issue 1", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file1.cs", LineStart = 10, LineEnd = 10, Rationale = "R1", Recommendation = "Rec1", Fingerprint = "fp1" },
+            new() { Title = "Issue 2", Severity = IssueSeverity.Warn, Category = IssueCategory.Style, FilePath = "file2.cs", LineStart = 20, LineEnd = 20, Rationale = "R2", Recommendation = "Rec2", Fingerprint = "fp2" }
         };
-        var result = new ReviewPlanResult(issues, 1, 1, 3);
+        var result = new ReviewPlanResult(0, issues, 1, 1, 3);
 
         // Act
         var formatted = CommentFormatter.FormatStateThread(result);
@@ -208,10 +215,10 @@ public class CommentFormatterTests
         // Arrange
         var issues = new List<ReviewIssue>
         {
-            new() { Title = "Issue 1", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file1.cs", Line = 10, Rationale = "R1", Recommendation = "Rec1", Fingerprint = "fingerprint1" },
-            new() { Title = "Issue 2", Severity = IssueSeverity.Warn, Category = IssueCategory.Style, FilePath = "file2.cs", Line = 20, Rationale = "R2", Recommendation = "Rec2", Fingerprint = "fingerprint2" }
+            new() { Title = "Issue 1", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file1.cs", LineStart = 10, LineEnd = 10, Rationale = "R1", Recommendation = "Rec1", Fingerprint = "fingerprint1" },
+            new() { Title = "Issue 2", Severity = IssueSeverity.Warn, Category = IssueCategory.Style, FilePath = "file2.cs", LineStart = 20, LineEnd = 20, Rationale = "R2", Recommendation = "Rec2", Fingerprint = "fingerprint2" }
         };
-        var result = new ReviewPlanResult(issues, 1, 1, 3);
+        var result = new ReviewPlanResult(0, issues, 1, 1, 3);
 
         // Act
         var formatted = CommentFormatter.FormatStateThread(result);
@@ -227,9 +234,9 @@ public class CommentFormatterTests
         // Arrange
         var issues = new List<ReviewIssue>
         {
-            new() { Title = "Issue", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "src/test.cs", Line = 42, Rationale = "R", Recommendation = "Rec", Fingerprint = "fp1" }
+            new() { Title = "Issue", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "src/test.cs", LineStart = 42, LineEnd = 42, Rationale = "R", Recommendation = "Rec", Fingerprint = "fp1" }
         };
-        var result = new ReviewPlanResult(issues, 1, 0, 3);
+        var result = new ReviewPlanResult(0, issues, 1, 0, 3);
 
         // Act
         var formatted = CommentFormatter.FormatStateThread(result);
@@ -240,27 +247,29 @@ public class CommentFormatterTests
     }
 
     [Fact]
-    public void FormatStateThread_ShouldContainSeverity()
+    public void FormatStateThread_ShouldContainIterationAndFingerprint()
     {
         // Arrange
         var issues = new List<ReviewIssue>
         {
-            new() { Title = "Issue", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file.cs", Line = 1, Rationale = "R", Recommendation = "Rec", Fingerprint = "fp1" }
+            new() { Title = "Issue", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file.cs", LineStart = 1, LineEnd = 1, Rationale = "R", Recommendation = "Rec", Fingerprint = "fp1" }
         };
-        var result = new ReviewPlanResult(issues, 1, 0, 3);
+        var result = new ReviewPlanResult(0, issues, 1, 0, 3);
 
         // Act
         var formatted = CommentFormatter.FormatStateThread(result);
 
         // Assert
-        formatted.Should().Contain("\"severity\":2");
+        // The state JSON includes iteration and fingerprint info for tracking
+        formatted.Should().Contain("\"iteration\":0");
+        formatted.Should().Contain("\"fingerprint\":\"fp1\"");
     }
 
     [Fact]
     public void FormatStateThread_WithNoIssues_ShouldReturnValidJson()
     {
         // Arrange
-        var result = new ReviewPlanResult([], 0, 0, 3);
+        var result = new ReviewPlanResult(0, [], 0, 0, 3);
 
         // Act
         var formatted = CommentFormatter.FormatStateThread(result);
@@ -276,9 +285,9 @@ public class CommentFormatterTests
         // Arrange
         var issues = new List<ReviewIssue>
         {
-            new() { Title = "Issue", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file.cs", Line = 1, Rationale = "R", Recommendation = "Rec", Fingerprint = "fp1" }
+            new() { Title = "Issue", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file.cs", LineStart = 1, LineEnd = 1, Rationale = "R", Recommendation = "Rec", Fingerprint = "fp1" }
         };
-        var result = new ReviewPlanResult(issues, 1, 0, 3);
+        var result = new ReviewPlanResult(0, issues, 1, 0, 3);
 
         // Act
         var formatted = CommentFormatter.FormatStateThread(result);
@@ -301,7 +310,8 @@ public class CommentFormatterTests
             Severity = IssueSeverity.Warn,
             Category = IssueCategory.Style,
             FilePath = "test.cs",
-            Line = 10,
+            LineStart = 10,
+            LineEnd = 10,
             Rationale = "Always use braces",
             Recommendation = "Add braces",
             FixExample = fixExample,
@@ -340,7 +350,8 @@ public class CommentFormatterTests
                 Severity = IssueSeverity.Error,
                 Category = category,
                 FilePath = "file.cs",
-                Line = 1,
+                LineStart = 1,
+                LineEnd = 1,
                 Rationale = "Rationale",
                 Recommendation = "Recommendation",
                 FixExample = null,
@@ -358,11 +369,11 @@ public class CommentFormatterTests
         // Arrange
         var issues = new List<ReviewIssue>
         {
-            new() { Title = "Issue 1", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file1.cs", Line = 10, Rationale = "R1", Recommendation = "Rec1", Fingerprint = "fp1" },
-            new() { Title = "Issue 2", Severity = IssueSeverity.Warn, Category = IssueCategory.Style, FilePath = "file2.cs", Line = 20, Rationale = "R2", Recommendation = "Rec2", Fingerprint = "fp2" },
-            new() { Title = "Issue 3", Severity = IssueSeverity.Info, Category = IssueCategory.Docs, FilePath = "file3.cs", Line = 30, Rationale = "R3", Recommendation = "Rec3", Fingerprint = "fp3" }
+            new() { Title = "Issue 1", Severity = IssueSeverity.Error, Category = IssueCategory.Correctness, FilePath = "file1.cs", LineStart = 10, LineEnd = 10, Rationale = "R1", Recommendation = "Rec1", Fingerprint = "fp1" },
+            new() { Title = "Issue 2", Severity = IssueSeverity.Warn, Category = IssueCategory.Style, FilePath = "file2.cs", LineStart = 20, LineEnd = 20, Rationale = "R2", Recommendation = "Rec2", Fingerprint = "fp2" },
+            new() { Title = "Issue 3", Severity = IssueSeverity.Info, Category = IssueCategory.Docs, FilePath = "file3.cs", LineStart = 30, LineEnd = 30, Rationale = "R3", Recommendation = "Rec3", Fingerprint = "fp3" }
         };
-        var result = new ReviewPlanResult(issues, 1, 2, 3);
+        var result = new ReviewPlanResult(0, issues, 1, 2, 3);
 
         // Act
         var formatted = CommentFormatter.FormatStateThread(result);

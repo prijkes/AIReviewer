@@ -9,6 +9,7 @@ using Azure.AI.OpenAI;
 using OpenAI.Chat;
 using System.ClientModel;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AIReviewer.AI;
 
@@ -53,7 +54,7 @@ public sealed class AzureFoundryAiClient : IAiClient
     }
 
     /// <inheritdoc/>
-    public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage, List<AzureDevOps.Models.ExistingComment> existingComments, CancellationToken cancellationToken)
+    public async Task<AiReviewResponse> ReviewAsync(string policy, ReviewFileDiff fileDiff, string language, ProgrammingLanguageDetector.ProgrammingLanguage programmingLanguage, List<ExistingComment> existingComments, CancellationToken cancellationToken)
     {
         _logger.LogDebug("Requesting AI review for {Path} ({DiffSize} bytes, {CommentCount} existing comments) in language: {Language}, programming language: {ProgrammingLanguage}",
             fileDiff.Path, fileDiff.DiffText.Length, existingComments.Count, language, ProgrammingLanguageDetector.GetDisplayName(programmingLanguage));
@@ -66,17 +67,26 @@ public sealed class AzureFoundryAiClient : IAiClient
         var systemPrompt = await _promptBuilder.BuildFileReviewSystemPromptAsync(policy, language, programmingLanguage, cancellationToken);
         var userPrompt = await _promptBuilder.BuildFileReviewUserPromptAsync(fileDiff, existingComments, cancellationToken);
 
+        // Log the prompts being sent to the AI
+        _logger.LogInformation("[AI-SYSTEM-PROMPT] System prompt for {Path}:\n{SystemPrompt}", fileDiff.Path, systemPrompt);
+        _logger.LogInformation("[AI-USER-PROMPT] User prompt for {Path}:\n{UserPrompt}", fileDiff.Path, userPrompt);
+
         var messages = new List<ChatMessage>
         {
             new SystemChatMessage(systemPrompt),
             new UserChatMessage(userPrompt)
         };
 
+        var schema = AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>();
+        
+        // Log the schema being sent to the AI
+        _logger.LogInformation("[AI-SCHEMA] JSON schema sent to AI:\n{Schema}", schema.ToString());
+        
         var options = new ChatCompletionOptions
         {
             ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
                 jsonSchemaFormatName: "ai_review_response",
-                jsonSchema: AiResponseSchemaGenerator.GenerateSchema<AiEnvelopeSchema>(),
+                jsonSchema: schema,
                 jsonSchemaIsStrict: true)
         };
 
@@ -97,9 +107,27 @@ public sealed class AzureFoundryAiClient : IAiClient
             completion = await HandleFunctionCallsAsync(chatClient, messages, options, completion, cancellationToken);
         }
 
+        // Check for refusal - model declined to respond
+        if (completion.Value.FinishReason == ChatFinishReason.ContentFilter)
+        {
+            _logger.LogWarning("[AI-REFUSAL] Model refused to respond for {Path} due to content filter. Returning empty results.", fileDiff.Path);
+            return new AiReviewResponse([]);
+        }
+
+        // Check if we have content to parse
+        if (completion.Value.Content.Count == 0 || string.IsNullOrEmpty(completion.Value.Content[0].Text))
+        {
+            _logger.LogWarning("[AI-EMPTY-RESPONSE] Model returned empty response for {Path}. Returning empty results.", fileDiff.Path);
+            return new AiReviewResponse([]);
+        }
+
         var content = completion.Value.Content[0].Text;
 
         stopwatch.Stop();
+        
+        // Log raw JSON response for debugging line number issues
+        _logger.LogInformation("[AI-JSON-RESPONSE] Raw AI response for {Path}:\n{JsonResponse}", fileDiff.Path, content);
+        
         var response = ParseResponse(content);
 
         _logger.LogInformation("AI reviewed {Path}: {IssueCount} issues found in {Ms}ms (response: {Size} bytes)",
@@ -144,6 +172,21 @@ public sealed class AzureFoundryAiClient : IAiClient
         };
 
         var completion = await chatClient.CompleteChatAsync(messages, options, cancellationToken);
+        
+        // Check for refusal - model declined to respond
+        if (completion.Value.FinishReason == ChatFinishReason.ContentFilter)
+        {
+            _logger.LogWarning("[AI-REFUSAL] Model refused to respond for metadata review due to content filter. Returning empty results.");
+            return new AiReviewResponse([]);
+        }
+
+        // Check if we have content to parse
+        if (completion.Value.Content.Count == 0 || string.IsNullOrEmpty(completion.Value.Content[0].Text))
+        {
+            _logger.LogWarning("[AI-EMPTY-RESPONSE] Model returned empty response for metadata review. Returning empty results.");
+            return new AiReviewResponse([]);
+        }
+
         var content = completion.Value.Content[0].Text;
 
         return ParseResponse(content);
@@ -162,12 +205,14 @@ public sealed class AzureFoundryAiClient : IAiClient
 
         // With structured outputs, enum values and required fields are guaranteed by the schema
         var issues = envelope.Issues.Select(issue => new AiIssue(
-            issue.Id,
             issue.Title,
             issue.Severity,
             issue.Category,
             issue.File,
-            issue.Line,
+            issue.FileLineStart,
+            issue.FileLineStartOffset,
+            issue.FileLineEnd,
+            issue.FileLineEndOffset,
             issue.Rationale,
             issue.Recommendation,
             issue.FixExample
@@ -179,24 +224,53 @@ public sealed class AzureFoundryAiClient : IAiClient
     /// <summary>
     /// Internal envelope record for deserializing the AI response JSON.
     /// With structured outputs, all required fields are guaranteed to be non-null.
+    /// Uses JsonPropertyName attributes to match the snake_case schema sent to the AI.
     /// </summary>
     /// <param name="Issues">List of issue items from the response.</param>
-    private sealed record AiEnvelope(List<AiItem> Issues);
+    private sealed record AiEnvelope(
+        [property: JsonPropertyName("issues")]
+        List<AiItem> Issues
+    );
 
     /// <summary>
     /// Internal record representing a single issue item in the AI response JSON.
     /// With structured outputs, enum values and required fields are guaranteed by the schema.
+    /// Uses JsonPropertyName attributes to match the snake_case schema sent to the AI.
     /// </summary>
     private sealed record AiItem(
-        string Id,
+        [property: JsonPropertyName("title")]
         string Title,
+        
+        [property: JsonPropertyName("severity")]
         IssueSeverity Severity,
+        
+        [property: JsonPropertyName("category")]
         IssueCategory Category,
+        
+        [property: JsonPropertyName("file")]
         string File,
-        int Line,
+        
+        [property: JsonPropertyName("file_line_start")]
+        int FileLineStart,
+        
+        [property: JsonPropertyName("file_line_start_offset")]
+        int FileLineStartOffset,
+        
+        [property: JsonPropertyName("file_line_end")]
+        int FileLineEnd,
+        
+        [property: JsonPropertyName("file_line_end_offset")]
+        int FileLineEndOffset,
+        
+        [property: JsonPropertyName("rationale")]
         string Rationale,
+        
+        [property: JsonPropertyName("recommendation")]
         string Recommendation,
-        string? FixExample);
+        
+        [property: JsonPropertyName("fix_example")]
+        string? FixExample
+    );
 
     /// <summary>
     /// Handles function calls from the AI, executing them and continuing the conversation.

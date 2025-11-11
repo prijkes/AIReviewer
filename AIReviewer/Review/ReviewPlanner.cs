@@ -22,11 +22,12 @@ public sealed record PullRequestMetadata(string Title, string Description, IRead
 /// <summary>
 /// Contains the results of a code review plan including all identified issues and counts.
 /// </summary>
+/// <param name="Iteration">The PR iteration number.</param>
 /// <param name="Issues">All identified issues from the review.</param>
 /// <param name="ErrorCount">Number of error-level issues.</param>
 /// <param name="WarningCount">Number of warning-level issues.</param>
 /// <param name="WarnBudget">Maximum allowed warnings before rejecting approval.</param>
-public sealed record ReviewPlanResult(IReadOnlyList<ReviewIssue> Issues, int ErrorCount, int WarningCount, int WarnBudget)
+public sealed record ReviewPlanResult(int Iteration, IReadOnlyList<ReviewIssue> Issues, int ErrorCount, int WarningCount, int WarnBudget)
 {
     /// <summary>
     /// Indicates whether the PR should be approved based on error and warning counts.
@@ -100,7 +101,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
 
         // Review files in parallel with pre-fetched comments
         var reviewTasks = diffsToReview.Select(diff =>
-            ReviewFileAsync(diff, basePolicyPath, language, iteration.Id ?? 0,
+            ReviewFileAsync(diff, basePolicyPath, language,
                 existingCommentsByFile.GetValueOrDefault(diff.Path, []),
                 cancellationToken));
 
@@ -117,7 +118,7 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
         var errorCount = issues.Count(i => i.Severity == IssueSeverity.Error);
         var warningCount = issues.Count(i => i.Severity == IssueSeverity.Warn);
 
-        return new ReviewPlanResult(issues, errorCount, warningCount, _options.WarnBudget);
+        return new ReviewPlanResult(iteration.Id ?? 0, issues, errorCount, warningCount, _options.WarnBudget);
     }
 
     /// <summary>
@@ -129,7 +130,6 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
         ReviewFileDiff diff,
         string basePolicyPath,
         string language,
-        int iterationId,
         List<ExistingComment> existingComments,
         CancellationToken cancellationToken)
     {
@@ -160,19 +160,21 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
 
             foreach (var issue in aiResponse.Issues.Take(_options.MaxIssuesPerFile))
             {
-                var fingerprint = ComputeFingerprint(diff, iterationId, issue);
+                var fingerprint = ComputeFingerprint(diff);
                 logger.LogInformation(
-                    "[FINGERPRINT] Generated fingerprint for {FilePath}:{Line} = {Fingerprint} (IterationId={IterationId}, FileHash={FileHash})",
-                    diff.Path, issue.Line, fingerprint, iterationId, diff.FileHash);
+                    "[FINGERPRINT] Generated fingerprint for {FilePath} = {Fingerprint} (FileHash={FileHash})",
+                    diff.Path, fingerprint, diff.FileHash);
 
                 issues.Add(new ReviewIssue
                 {
-                    Id = issue.Id,
                     Title = issue.Title,
                     Severity = issue.Severity,
                     Category = issue.Category,
                     FilePath = string.IsNullOrEmpty(issue.File) ? diff.Path : issue.File,
-                    Line = issue.Line,
+                    LineStart = issue.FileLineStart,
+                    LineStartOffset = issue.FileLineStartOffset,
+                    LineEnd = issue.FileLineEnd,
+                    LineEndOffset = issue.FileLineEndOffset,
                     Rationale = issue.Rationale,
                     Recommendation = issue.Recommendation,
                     FixExample = issue.FixExample,
@@ -206,41 +208,42 @@ public sealed class ReviewPlanner(ILogger<ReviewPlanner> logger, IAiClient aiCli
             [.. pr.Commits.Select(c => c.Comment ?? string.Empty)]);
 
         var response = await aiClient.ReviewPullRequestMetadataAsync(policy, metadata, language, cancellationToken);
+        
+        // Use PR description content for fingerprint - ensures deterministic fingerprinting
+        // that only changes when the description itself changes, avoiding duplicate comments
+        var descriptionContent = pr.PullRequest.Description ?? string.Empty;
+        var baseFingerprint = Logging.HashSha256(descriptionContent);
+        
         return response.Issues.Select(issue =>
         {
-            // NOTE: Metadata reviews still use AI-generated fields (Id, Title) in fingerprint
-            // This may cause duplicates if the AI generates different IDs/titles between runs
-            var fingerprint = Logging.HashSha256($"{issue.Id}:{issue.Title}:{iterationId ?? 0}");
             logger.LogInformation(
-                "[FINGERPRINT-METADATA] Generated fingerprint for metadata issue = {Fingerprint} (Id={Id}, Title={Title}, IterationId={IterationId})",
-                fingerprint, issue.Id, issue.Title, iterationId ?? 0);
+                "[FINGERPRINT-METADATA] Generated fingerprint for metadata issue = {Fingerprint} (based on description content hash)",
+                baseFingerprint);
 
             return new ReviewIssue
             {
-                Id = issue.Id,
                 Title = issue.Title,
                 Severity = issue.Severity,
                 Category = issue.Category,
                 FilePath = string.Empty,
-                Line = 0,
+                LineStart = 0,
+                LineEnd = 0,
                 Rationale = issue.Rationale,
                 Recommendation = issue.Recommendation,
                 FixExample = issue.FixExample,
-                Fingerprint = fingerprint
+                Fingerprint = baseFingerprint
             };
         });
     }
 
     /// <summary>
     /// Computes a unique fingerprint for an issue based on stable identifiers only.
-    /// Uses file path, line number, iteration ID, and file hash to ensure consistent
+    /// Uses file path, and file hash to ensure consistent
     /// fingerprints across multiple bot runs, preventing duplicate comments.
-    /// AI-generated fields (Id, Title) are excluded as they can vary between runs.
     /// </summary>
     /// <param name="diff">The file diff containing the issue.</param>
     /// <param name="iterationId">The PR iteration ID.</param>
-    /// <param name="issue">The AI-identified issue.</param>
     /// <returns>A SHA-256 hash fingerprint string.</returns>
-    private static string ComputeFingerprint(ReviewFileDiff diff, int iterationId, AiIssue issue) =>
-        Logging.HashSha256($"{diff.Path}:{issue.Line}:{iterationId}:{diff.FileHash}");
+    private static string ComputeFingerprint(ReviewFileDiff diff) =>
+        Logging.HashSha256($"{diff.Path}:{diff.FileHash}");
 }
