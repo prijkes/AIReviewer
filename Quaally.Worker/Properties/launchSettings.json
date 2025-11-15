@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "Quaally": {
-      "commandName": "Project",
-      "commandLineArgs": "--settings E:\\Projects\\Quaally\\Quaally.Worker\\bin\\Debug\\net8.0\\settings.ini --provider-env E:\\Projects\\Quaally\\Quaally.Worker\\bin\\Debug\\net8.0\\azure.env --provider-settings E:\\Projects\\Quaally\\Quaally.Worker\\bin\\Debug\\net8.0\\azure.ini"
-    }
-  }
-}

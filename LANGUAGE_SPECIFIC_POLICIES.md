@@ -1,10 +1,10 @@
 # Language-Specific Policies
 
-Quaally now supports language-specific review policies and prompts based on file type. This allows for more accurate and relevant code reviews tailored to each programming language's best practices.
+Quaaly now supports language-specific review policies and prompts based on file type. This allows for more accurate and relevant code reviews tailored to each programming language's best practices.
 
 ## Overview
 
-When reviewing code, Quaally:
+When reviewing code, Quaaly:
 1. **Detects the programming language** based on file extension
 2. **Loads language-specific policies** (if available) from the `policy/` directory
 3. **Uses language-specific prompts** that emphasize relevant best practices
@@ -155,7 +155,7 @@ To add support for a new programming language:
 
 ### 1. Update ProgrammingLanguageDetector
 
-Add the language to the enum in `Quaally/Utils/ProgrammingLanguageDetector.cs`:
+Add the language to the enum in `Quaaly/Utils/ProgrammingLanguageDetector.cs`:
 
 ```csharp
 public enum ProgrammingLanguage

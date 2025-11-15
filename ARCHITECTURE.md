@@ -1,20 +1,20 @@
-# Quaally Architecture - Queue-Based Conversational System
+# Quaaly Architecture - Queue-Based Conversational System
 
 ## Project Structure
 
 The solution uses a **layered architecture** with clear separation of concerns:
 
 ```
-Quaally.sln
-├── Quaally.Core/              # Domain models, interfaces, enums
+Quaaly.sln
+├── Quaaly.Core/              # Domain models, interfaces, enums
 │   ├── Models/                # Core domain models (PullRequest, FileChange, etc.)
 │   ├── Interfaces/            # Service interfaces (ISourceControlClient, etc.)
 │   └── Enums/                 # Enumerations (SourceProvider, FileChangeType, etc.)
 │
-├── Quaally.Data/              # Data access and telemetry
+├── Quaaly.Data/              # Data access and telemetry
 │   └── ReviewMetrics.cs       # Metrics tracking and logging
 │
-├── Quaally.Infrastructure/    # External integrations and utilities
+├── Quaaly.Infrastructure/    # External integrations and utilities
 │   ├── AI/                    # AI client implementations
 │   ├── AzureDevOps/          # Azure DevOps SDK integration
 │   ├── Providers/            # Source provider implementations
@@ -24,13 +24,13 @@ Quaally.sln
 │   ├── Options/              # Configuration options
 │   └── Review/               # Review planning and execution
 │
-├── Quaally.Worker/           # Application entry point
+├── Quaaly.Worker/           # Application entry point
 │   ├── Program.cs            # Main application host
 │   ├── ReviewerHostedService.cs
 │   ├── Queue/                # Queue processing
 │   └── Orchestration/        # AI orchestration
 │
-└── Quaally.Tests/            # Unit tests
+└── Quaaly.Tests/            # Unit tests
     ├── AI/
     ├── Diff/
     ├── Options/
@@ -40,17 +40,17 @@ Quaally.sln
 ### Layer Dependencies
 
 ```
-Quaally.Worker
+Quaaly.Worker
     ↓ depends on
-Quaally.Infrastructure
+Quaaly.Infrastructure
     ↓ depends on
-Quaally.Core
+Quaaly.Core
     ↑
-Quaally.Data
+Quaaly.Data
     ↓ depends on
-Quaally.Core
+Quaaly.Core
 
-Quaally.Tests → references all projects
+Quaaly.Tests → references all projects
 ```
 
 **Design Principles:**
@@ -61,7 +61,7 @@ Quaally.Tests → references all projects
 
 ## Overview
 
-Quaally is a **queue-based, conversational AI assistant** with autonomous function calling capabilities for pull request code reviews.
+Quaaly is a **queue-based, conversational AI assistant** with autonomous function calling capabilities for pull request code reviews.
 
 ## High-Level Architecture
 
@@ -69,7 +69,7 @@ Quaally is a **queue-based, conversational AI assistant** with autonomous functi
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Azure DevOps                                 │
 │                                                                      │
-│  Pull Request ──► User Comments ──► @Quaally please review      │
+│  Pull Request ──► User Comments ──► @Quaaly please review      │
 │                         │                                            │
 │                         │ (Webhook Trigger)                          │
 │                         ▼                                            │
@@ -81,7 +81,7 @@ Quaally is a **queue-based, conversational AI assistant** with autonomous functi
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    Azure Service Bus                                 │
 │                                                                      │
-│  Queue: Quaally-events                                           │
+│  Queue: Quaaly-events                                           │
 │  ├─ Message 1: PR #123 comment                                     │
 │  ├─ Message 2: PR #456 comment                                     │
 │  └─ Message 3: PR #789 comment                                     │
@@ -91,7 +91,7 @@ Quaally is a **queue-based, conversational AI assistant** with autonomous functi
                           │ (Pull Messages)
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    Quaally Application                            │
+│                    Quaaly Application                            │
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────┐   │
 │  │         QueueProcessorHostedService                        │   │
@@ -268,7 +268,7 @@ Message arrives → Deserialize → Route by event type → Process → Complete
 ### Typical Conversation Flow
 
 ```
-User: "@Quaally please review this PR"
+User: "@Quaaly please review this PR"
   ↓
 Queue: PR comment event
   ↓
@@ -332,8 +332,8 @@ Enabled = true               # Enable function calling
 MaxCalls = 10                # Max function calls per review
 
 [Queue]
-QueueName = Quaally-events      # Azure Service Bus queue
-BotDisplayName = Quaally        # Name for @mentions
+QueueName = Quaaly-events      # Azure Service Bus queue
+BotDisplayName = Quaaly        # Name for @mentions
 MaxConcurrentCalls = 5             # Concurrent message processing
 MaxWaitTimeSeconds = 30            # Max wait for messages
 ```

@@ -216,7 +216,7 @@ The following provider services need to be created in `Providers/AzureDevOps/`:
 ## Current File Structure
 
 ```
-Quaally/
+Quaaly/
 ├── Core/                                    ✅ DONE
 │   ├── Enums/
 │   │   ├── SourceProvider.cs

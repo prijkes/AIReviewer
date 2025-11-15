@@ -36,44 +36,44 @@ stages:
               ENV_FILE_CONTENT: '$(ENV_FILE_CONTENT)'
 
           - pwsh: |
-              if (-not $env:QUAALLY_REPO_URL) {
-                Write-Error "QUAALLY_REPO_URL environment variable is not set"
+              if (-not $env:Quaaly_REPO_URL) {
+                Write-Error "Quaaly_REPO_URL environment variable is not set"
                 exit 1
               }
-              Write-Host "Cloning Quaally repository from: $env:QUAALLY_REPO_URL"
-              New-Item -ItemType Directory -Force -Path "$(Build.SourcesDirectory)\quaally-clone" | Out-Null
-              git clone $env:QUAALLY_REPO_URL "$(Build.SourcesDirectory)\quaally-clone"
+              Write-Host "Cloning Quaaly repository from: $env:Quaaly_REPO_URL"
+              New-Item -ItemType Directory -Force -Path "$(Build.SourcesDirectory)\Quaaly-clone" | Out-Null
+              git clone $env:Quaaly_REPO_URL "$(Build.SourcesDirectory)\Quaaly-clone"
               if ($LASTEXITCODE -ne 0) {
-                Write-Error "Failed to clone Quaally repository"
+                Write-Error "Failed to clone Quaaly repository"
                 exit 1
               }
-              Write-Host "Successfully cloned Quaally repository"
-            displayName: "Clone Quaally Repository"
+              Write-Host "Successfully cloned Quaaly repository"
+            displayName: "Clone Quaaly Repository"
             env:
-              QUAALLY_REPO_URL: '$(QUAALLY_REPO_URL)'
+              Quaaly_REPO_URL: '$(Quaaly_REPO_URL)'
 
           - pwsh: |
-              Write-Host "Restoring Quaally project..."
-              dotnet restore "$(Build.SourcesDirectory)\quaally-clone\Quaally\Quaally.csproj"
+              Write-Host "Restoring Quaaly project..."
+              dotnet restore "$(Build.SourcesDirectory)\Quaaly-clone\Quaaly\Quaaly.csproj"
               if ($LASTEXITCODE -ne 0) {
                 Write-Error "dotnet restore failed"
                 exit 1
               }
-            displayName: "Restore Quaally"
+            displayName: "Restore Quaaly"
             condition: ne(variables['DRY_RUN'], 'skip')
 
           - pwsh: |
-              Write-Host "Building Quaally project..."
-              dotnet build "$(Build.SourcesDirectory)\quaally-clone\Quaally\Quaally.csproj" --configuration Release --no-restore
+              Write-Host "Building Quaaly project..."
+              dotnet build "$(Build.SourcesDirectory)\Quaaly-clone\Quaaly\Quaaly.csproj" --configuration Release --no-restore
               if ($LASTEXITCODE -ne 0) {
                 Write-Error "dotnet build failed"
                 exit 1
               }
-            displayName: "Build Quaally"
+            displayName: "Build Quaaly"
             condition: ne(variables['DRY_RUN'], 'skip')
 
           - pwsh: |
-              Write-Host "Running Quaally..."
+              Write-Host "Running Quaaly..."
               $envFilePath = "$(Build.SourcesDirectory)\secrets\.env"
               if (Test-Path $envFilePath) {
                 Write-Host "Loading environment variables from .env file"
@@ -95,9 +95,9 @@ stages:
               $env:LOCAL_REPO_PATH = "$(Build.SourcesDirectory)"
               
               Set-Location "$(Build.SourcesDirectory)"
-              dotnet run --configuration Release --project "$(Build.SourcesDirectory)\quaally-clone\Quaally\Quaally.csproj" --no-build
+              dotnet run --configuration Release --project "$(Build.SourcesDirectory)\Quaaly-clone\Quaaly\Quaaly.csproj" --no-build
               if ($LASTEXITCODE -ne 0) {
-                Write-Error "Quaally execution failed"
+                Write-Error "Quaaly execution failed"
                 exit 1
               }
             displayName: "Run AI PR Reviewer"

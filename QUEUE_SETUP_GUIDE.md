@@ -1,4 +1,4 @@
-# Quaally Queue-Based Setup Guide
+# Quaaly Queue-Based Setup Guide
 
 This guide will help you set up the queue-based, conversational AI reviewer from scratch.
 
@@ -24,7 +24,7 @@ This guide will help you set up the queue-based, conversational AI reviewer from
 5. Fill in:
    - **Subscription**: Your subscription
    - **Resource Group**: Create new or use existing
-   - **Namespace name**: `Quaally-sb` (or your choice)
+   - **Namespace name**: `Quaaly-sb` (or your choice)
    - **Location**: Choose closest to your Azure DevOps
    - **Pricing tier**: **Basic** (sufficient for this use case)
 6. Click "Review + Create" → "Create"
@@ -36,7 +36,7 @@ This guide will help you set up the queue-based, conversational AI reviewer from
 2. Click "Queues" in the left menu
 3. Click "+ Queue"
 4. Configure:
-   - **Name**: `Quaally-events`
+   - **Name**: `Quaaly-events`
    - **Max delivery count**: 10 (allows retries)
    - **Message time to live**: 14 days (default)
    - **Lock duration**: 5 minutes
@@ -48,7 +48,7 @@ This guide will help you set up the queue-based, conversational AI reviewer from
 1. In your Service Bus namespace, click "Shared access policies"
 2. Click "+ Add"
 3. Configure:
-   - **Policy name**: `QuaallyPolicy`
+   - **Policy name**: `QuaalyPolicy`
    - **Permissions**: Check both "Send" and "Listen"
 4. Click "Create"
 5. Click on the newly created policy
@@ -77,9 +77,9 @@ This guide will help you set up the queue-based, conversational AI reviewer from
 ### 2.3 Configure Action
 
 1. Fill in:
-   - **Service Bus namespace**: Your namespace name (e.g., `Quaally-sb`)
+   - **Service Bus namespace**: Your namespace name (e.g., `Quaaly-sb`)
    - **Service Bus SAS Connection String**: Paste the connection string from Step 1.3
-   - **Queue name**: `Quaally-events`
+   - **Queue name**: `Quaaly-events`
    - **Resource details to send**: **All**
    - **Messages to send**: **All**
    - **Resource version**: Leave as default
@@ -97,11 +97,11 @@ This guide will help you set up the queue-based, conversational AI reviewer from
 
 The service hook is now active! Every time someone comments on a PR, an event will be sent to your queue.
 
-## Step 3: Configure Quaally Application
+## Step 3: Configure Quaaly Application
 
 ### 3.1 Create .env File
 
-Create a `.env` file in the `Quaally` directory:
+Create a `.env` file in the `Quaaly` directory:
 
 ```ini
 # Azure DevOps Configuration
@@ -116,7 +116,7 @@ AI_FOUNDRY_ENDPOINT=https://your-foundry.openai.azure.com/
 AI_FOUNDRY_API_KEY=your-api-key-here
 
 # Azure Service Bus (NEW!)
-ServiceBusConnectionString=Endpoint=sb://Quaally-sb.servicebus.windows.net/;SharedAccessKeyName=QuaallyPolicy;SharedAccessKey=your-key-here
+ServiceBusConnectionString=Endpoint=sb://Quaaly-sb.servicebus.windows.net/;SharedAccessKeyName=QuaalyPolicy;SharedAccessKey=your-key-here
 ```
 
 **Notes:**
@@ -158,8 +158,8 @@ MaxCommitMessagesToReview = 5
 JapaneseDetectionThreshold = 0.3
 
 [Queue]
-QueueName = Quaally-events
-BotDisplayName = Quaally
+QueueName = Quaaly-events
+BotDisplayName = Quaaly
 MaxConcurrentCalls = 5
 MaxWaitTimeSeconds = 30
 ```
@@ -174,7 +174,7 @@ MaxWaitTimeSeconds = 30
 ### 4.1 Build
 
 ```bash
-cd Quaally
+cd Quaaly
 dotnet build
 ```
 
@@ -188,12 +188,12 @@ dotnet run --env .env
 
 Expected output:
 ```
-info: Quaally.Queue.QueueProcessorHostedService[0]
+info: Quaaly.Queue.QueueProcessorHostedService[0]
       Queue Processor starting...
-info: Quaally.Queue.QueueProcessorHostedService[0]
-      Service Bus processor initialized for queue: Quaally-events with 5 max concurrent calls
-info: Quaally.Queue.QueueProcessorHostedService[0]
-      Queue Processor started successfully. Listening on queue: Quaally-events
+info: Quaaly.Queue.QueueProcessorHostedService[0]
+      Service Bus processor initialized for queue: Quaaly-events with 5 max concurrent calls
+info: Quaaly.Queue.QueueProcessorHostedService[0]
+      Queue Processor started successfully. Listening on queue: Quaaly-events
 ```
 
 **The application is now running and listening for PR comments!**
@@ -209,25 +209,25 @@ info: Quaally.Queue.QueueProcessorHostedService[0]
 
 Add a comment on the PR:
 ```
-@Quaally please review this PR
+@Quaaly please review this PR
 ```
 
 ### 5.3 Watch the Logs
 
 In your running application, you should see:
 ```
-info: Quaally.Queue.QueueProcessorHostedService[0]
+info: Quaaly.Queue.QueueProcessorHostedService[0]
       Processing message abc-123-def (Delivery count: 1)
-info: Quaally.Orchestration.AiOrchestrator[0]
+info: Quaaly.Orchestration.AiOrchestrator[0]
       Processing comment event for PR 123 in repo MyRepo
-info: Quaally.Orchestration.AiOrchestrator[0]
+info: Quaaly.Orchestration.AiOrchestrator[0]
       User request: please review this PR
-info: Quaally.AzureDevOps.Functions.AzureDevOpsFunctionExecutor[0]
+info: Quaaly.AzureDevOps.Functions.AzureDevOpsFunctionExecutor[0]
       Executing function: get_pr_files
-info: Quaally.AzureDevOps.Functions.AzureDevOpsFunctionExecutor[0]
+info: Quaaly.AzureDevOps.Functions.AzureDevOpsFunctionExecutor[0]
       Executing function: get_full_file_content
 ...
-info: Quaally.Orchestration.AiOrchestrator[0]
+info: Quaaly.Orchestration.AiOrchestrator[0]
       Successfully replied to comment in thread 456
 ```
 
@@ -239,35 +239,35 @@ The bot should reply to your comment with its review!
 
 ### Example 1: General Review
 ```
-@Quaally please review this PR for code quality and best practices
+@Quaaly please review this PR for code quality and best practices
 ```
 
 ### Example 2: Specific File Review
 ```
-@Quaally can you check the changes in Program.cs?
+@Quaaly can you check the changes in Program.cs?
 ```
 
 ### Example 3: Security Review
 ```
-@Quaally please review this PR for security issues
+@Quaaly please review this PR for security issues
 ```
 
 ### Example 4: Approve if Good
 ```
-@Quaally if everything looks good, please approve this PR
+@Quaaly if everything looks good, please approve this PR
 ```
 
 ### Example 5: Continue Conversation
 When the bot creates a comment thread:
 ```
 User: (fixes the issue)
-User (in thread): "@Quaally I've fixed this, please review and close if OK"
+User (in thread): "@Quaaly I've fixed this, please review and close if OK"
 Bot: (reviews the fix and closes the thread if satisfied)
 ```
 
 ### Example 6: Ask Questions
 ```
-@Quaally can you explain what this function does in MyClass.cs?
+@Quaaly can you explain what this function does in MyClass.cs?
 ```
 
 ## Available Functions
@@ -313,7 +313,7 @@ The AI can autonomously call these functions to accomplish tasks:
 2. Check application logs for errors
 3. Verify Service Bus connection string is correct
 4. Check Azure Service Bus queue - are messages arriving?
-   - Go to Azure Portal → Your Service Bus → Queues → Quaally-events
+   - Go to Azure Portal → Your Service Bus → Queues → Quaaly-events
    - Look at "Active message count"
 
 ### Issue: "ServiceBusConnectionString environment variable is not set"
@@ -341,7 +341,7 @@ The AI can autonomously call these functions to accomplish tasks:
 **Check:**
 1. Verify `BotDisplayName` in settings.ini matches what you're typing
 2. @mentions are case-insensitive but spelling must match
-3. Try: `@Quaally` or `@<Quaally>` (XML-style)
+3. Try: `@Quaaly` or `@<Quaaly>` (XML-style)
 
 ### Issue: Deserialization error with invalid characters like `@\u0006string`
 
@@ -357,7 +357,7 @@ Azure DevOps Service Hook is sending messages in DataContract binary serializati
 1. The application will automatically detect and extract JSON from binary payloads (as of the latest update)
 2. However, for optimal performance, reconfigure the Service Hook:
    - Go to Azure DevOps → Project Settings → Service Hooks
-   - Find your Quaally subscription and click "..."  → Edit
+   - Find your Quaaly subscription and click "..."  → Edit
    - Ensure the content type is set to `application/json`
    - If the option isn't available, delete and recreate the Service Hook following Step 2.3
 
@@ -420,13 +420,13 @@ MaxConcurrentCalls = 10  # Process more messages simultaneously
 Development:
 ```ini
 [Queue]
-QueueName = Quaally-events-dev
+QueueName = Quaaly-events-dev
 ```
 
 Production:
 ```ini
 [Queue]
-QueueName = Quaally-events-prod
+QueueName = Quaaly-events-prod
 ```
 
 ## Deployment Options
@@ -441,15 +441,15 @@ dotnet run --env .env
 ```dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY Quaally/Quaally.csproj .
+COPY Quaaly/Quaaly.csproj .
 RUN dotnet restore
-COPY Quaally/ .
+COPY Quaaly/ .
 RUN dotnet publish -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/runtime:8.0
 WORKDIR /app
 COPY --from=build /app .
-ENTRYPOINT ["dotnet", "Quaally.dll"]
+ENTRYPOINT ["dotnet", "Quaaly.dll"]
 ```
 
 ### Option 3: Azure App Service
@@ -463,8 +463,8 @@ Run as a systemd service on Linux or Windows Service.
 ## Next Steps
 
 1. ✅ **Complete this setup** - Get the basic system working
-2. 📝 **Customize prompts** - Edit files in `Quaally/Resources/prompts/`
-3. 🔒 **Add policies** - Update `Quaally/Resources/policy/` for your standards
+2. 📝 **Customize prompts** - Edit files in `Quaaly/Resources/prompts/`
+3. 🔒 **Add policies** - Update `Quaaly/Resources/policy/` for your standards
 4. 🧪 **Test thoroughly** - Try different scenarios and edge cases
 5. 📊 **Monitor usage** - Watch costs and adjust concurrency if needed
 6. 🚀 **Roll out gradually** - Start with one repo, expand as confidence grows

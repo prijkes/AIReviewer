@@ -1,6 +1,6 @@
-# Quaally - Conversational AI Code Reviewer
+# Quaaly - Conversational AI Code Reviewer
 
-**QUallity Assurance AnLLYzer** - An AI-powered, conversational code review assistant for pull requests. Quaally operates as a queue-based service that responds to @mentions in PR comments, providing intelligent code reviews with autonomous function calling capabilities.
+**QUality Assurance AnaLYzer** - An AI-powered, conversational code review assistant for pull requests. Quaaly operates as a queue-based service that responds to @mentions in PR comments, providing intelligent code reviews with autonomous function calling capabilities.
 
 Supports **Azure DevOps** with extensible architecture for GitHub, GitLab, and other providers.
 
@@ -31,13 +31,13 @@ See **[QUEUE_SETUP_GUIDE.md](QUEUE_SETUP_GUIDE.md)** for detailed instructions.
 
 **Quick version:**
 1. Create Azure Service Bus namespace (Basic tier)
-2. Create queue named `Quaally-events`
+2. Create queue named `Quaaly-events`
 3. Get connection string
 4. Configure Azure DevOps webhook (Pull request commented on → Service Bus)
 
 ### Step 2: Configure Application
 
-Create `.env` file in `Quaally.Worker/` directory:
+Create `.env` file in `Quaaly.Worker/` directory:
 
 ```ini
 # Azure DevOps
@@ -55,12 +55,12 @@ AI_FOUNDRY_API_KEY=your-api-key
 ServiceBusConnectionString=Endpoint=sb://...
 ```
 
-Update `Quaally.Worker/settings.ini`:
+Update `Quaaly.Worker/settings.ini`:
 
 ```ini
 [Queue]
-QueueName = Quaally-events
-BotDisplayName = Quaally
+QueueName = Quaaly-events
+BotDisplayName = Quaaly
 MaxConcurrentCalls = 5
 MaxWaitTimeSeconds = 30
 ```
@@ -68,27 +68,27 @@ MaxWaitTimeSeconds = 30
 ### Step 3: Run the Application
 
 ```bash
-cd Quaally.Worker
+cd Quaaly.Worker
 dotnet build
 dotnet run --env .env
 ```
 
 Expected output:
 ```
-info: Queue Processor started successfully. Listening on queue: Quaally-events
+info: Queue Processor started successfully. Listening on queue: Quaaly-events
 ```
 
 ### Step 4: Test It!
 
 1. Create a PR in Azure DevOps
-2. Add a comment: `@Quaally please review this PR`
+2. Add a comment: `@Quaaly please review this PR`
 3. Watch the bot respond with a review!
 
 ## 💡 Usage Examples
 
 ### Code Review
 ```
-@Quaally please review this PR for code quality and security issues
+@Quaaly please review this PR for code quality and security issues
 ```
 
 The AI will:
@@ -100,31 +100,31 @@ The AI will:
 
 ### Specific File Review
 ```
-@Quaally can you review the changes in Program.cs?
+@Quaaly can you review the changes in Program.cs?
 ```
 
 ### Explain Code
 ```
-@Quaally please explain what the ProcessMessage method does
+@Quaaly please explain what the ProcessMessage method does
 ```
 
 ### Approve PR
 ```
-@Quaally if everything looks good, please approve this PR
+@Quaaly if everything looks good, please approve this PR
 ```
 
 ### Continue Conversation
 ```
-User: @Quaally review this
+User: @Quaaly review this
 Bot: (creates thread on line 42)
 User: (fixes code)
-User in thread: @Quaally I've fixed this, please check
+User in thread: @Quaaly I've fixed this, please check
 Bot: (reviews fix, closes thread if satisfied)
 ```
 
 ### Search Codebase
 ```
-@Quaally can you find all usages of the IPaymentService interface?
+@Quaaly can you find all usages of the IPaymentService interface?
 ```
 
 ## 🛠️ Available Functions
@@ -172,7 +172,7 @@ The AI can autonomously call these 20 functions:
 
 ## ⚙️ Configuration
 
-Quaally uses a layered configuration system:
+Quaaly uses a layered configuration system:
 
 1. **settings.ini** - Static defaults with inline documentation
 2. **Environment variables** - Dynamic values and secrets
@@ -192,8 +192,8 @@ Enabled = true
 MaxConversationIterations = 10
 
 [Queue]
-QueueName = Quaally-events
-BotDisplayName = Quaally
+QueueName = Quaaly-events
+BotDisplayName = Quaaly
 MaxConcurrentCalls = 5
 ```
 
@@ -212,7 +212,7 @@ ADO_ACCESS_TOKEN=...
 ## 🏗️ Architecture
 
 ```
-Azure DevOps PR Comment (@Quaally)
+Azure DevOps PR Comment (@Quaaly)
     ↓
 Azure Service Bus Queue
     ↓
@@ -228,12 +228,12 @@ Azure DevOps API (posts results)
 ### Project Structure
 
 ```
-Quaally.sln
-├── Quaally.Core/              # Domain models, interfaces, enums
-├── Quaally.Data/              # Data access and telemetry
-├── Quaally.Infrastructure/    # External integrations and utilities
-├── Quaally.Worker/           # Application entry point
-└── Quaally.Tests/            # Unit tests
+Quaaly.sln
+├── Quaaly.Core/              # Domain models, interfaces, enums
+├── Quaaly.Data/              # Data access and telemetry
+├── Quaaly.Infrastructure/    # External integrations and utilities
+├── Quaaly.Worker/           # Application entry point
+└── Quaaly.Tests/            # Unit tests
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed diagrams and explanations.
@@ -289,14 +289,14 @@ info: Successfully replied to comment in thread 456
 
 ### "ServiceBusConnectionString not set"
 
-- Ensure `.env` file exists in `Quaally.Worker/` directory
+- Ensure `.env` file exists in `Quaaly.Worker/` directory
 - Verify `ServiceBusConnectionString` is in `.env`
 - Try running with `dotnet run --env .env`
 
 ### Bot Mentions Not Detected
 
 - Verify `BotDisplayName` in `settings.ini` matches your @mention
-- Try both `@Quaally` and `@<Quaally>`
+- Try both `@Quaaly` and `@<Quaaly>`
 - Check application logs for "Bot not mentioned" messages
 
 ### Messages in Dead-Letter Queue
@@ -319,7 +319,7 @@ info: Successfully replied to comment in thread 456
 
 ### Provider Architecture
 
-Quaally uses a provider-agnostic architecture:
+Quaaly uses a provider-agnostic architecture:
 
 ```
 ┌─────────────────────────────────┐
@@ -370,8 +370,8 @@ dotnet run --env .env
 
 ### Option 2: Azure Container Instance
 ```bash
-docker build -t quaally .
-docker run -e ServiceBusConnectionString="..." quaally
+docker build -t Quaaly .
+docker run -e ServiceBusConnectionString="..." Quaaly
 ```
 
 ### Option 3: Azure App Service

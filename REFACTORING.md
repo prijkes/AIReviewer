@@ -9,7 +9,7 @@ This document describes the major refactoring to support multiple source control
 ### Before: Tightly Coupled to Azure DevOps
 
 ```
-Quaally/
+Quaaly/
 ├── AzureDevOps/           # ADO-specific code everywhere
 │   ├── AdoSdkClient.cs
 │   ├── Functions/
@@ -21,7 +21,7 @@ Quaally/
 ### After: Provider-Agnostic with Abstraction Layer
 
 ```
-Quaally/
+Quaaly/
 ├── Core/                       # NEW - Generic abstractions
 │   ├── Enums/                 # Provider-agnostic enums
 │   ├── Models/                # Generic models
@@ -204,8 +204,8 @@ services.AddSingleton<ISourceControlClient>(sp =>
 ### For Developers
 
 - Import namespaces changed:
-  - Old: `using Quaally.AzureDevOps.Models;`
-  - New: `using Quaally.Core.Models;`
+  - Old: `using Quaaly.AzureDevOps.Models;`
+  - New: `using Quaaly.Core.Models;`
   
 - Type names changed:
   - Old: `GitPullRequest` (ADO SDK type)
@@ -265,36 +265,36 @@ Some functions will be provider-specific:
 ## Files Modified/Created
 
 ### Created
-- `Quaally/Core/Enums/SourceProvider.cs`
-- `Quaally/Core/Enums/PullRequestStatus.cs`
-- `Quaally/Core/Enums/FileChangeType.cs`
-- `Quaally/Core/Enums/ThreadStatus.cs`
-- `Quaally/Core/Models/Repository.cs`
-- `Quaally/Core/Models/UserIdentity.cs`
-- `Quaally/Core/Models/PullRequest.cs`
-- `Quaally/Core/Models/Comment.cs`
-- `Quaally/Core/Models/ReviewThread.cs`
-- `Quaally/Core/Models/FileChange.cs`
-- `Quaally/Core/Models/CommentEvent.cs`
-- `Quaally/Core/Interfaces/ISourceControlClient.cs`
-- `Quaally/Core/Interfaces/ICommentService.cs`
-- `Quaally/Core/Interfaces/IApprovalService.cs`
-- `Quaally/Core/Interfaces/IFunctionExecutor.cs`
-- `Quaally/Core/Interfaces/IEventProcessor.cs`
-- `Quaally/Providers/AzureDevOps/Adapters/ModelAdapter.cs`
+- `Quaaly/Core/Enums/SourceProvider.cs`
+- `Quaaly/Core/Enums/PullRequestStatus.cs`
+- `Quaaly/Core/Enums/FileChangeType.cs`
+- `Quaaly/Core/Enums/ThreadStatus.cs`
+- `Quaaly/Core/Models/Repository.cs`
+- `Quaaly/Core/Models/UserIdentity.cs`
+- `Quaaly/Core/Models/PullRequest.cs`
+- `Quaaly/Core/Models/Comment.cs`
+- `Quaaly/Core/Models/ReviewThread.cs`
+- `Quaaly/Core/Models/FileChange.cs`
+- `Quaaly/Core/Models/CommentEvent.cs`
+- `Quaaly/Core/Interfaces/ISourceControlClient.cs`
+- `Quaaly/Core/Interfaces/ICommentService.cs`
+- `Quaaly/Core/Interfaces/IApprovalService.cs`
+- `Quaaly/Core/Interfaces/IFunctionExecutor.cs`
+- `Quaaly/Core/Interfaces/IEventProcessor.cs`
+- `Quaaly/Providers/AzureDevOps/Adapters/ModelAdapter.cs`
 
 ### To Be Created
-- `Quaally/Providers/AzureDevOps/AzureDevOpsSourceControlClient.cs`
-- `Quaally/Providers/AzureDevOps/AzureDevOpsCommentService.cs`
-- `Quaally/Providers/AzureDevOps/AzureDevOpsApprovalService.cs`
-- `Quaally/Providers/AzureDevOps/AzureDevOpsFunctionExecutor.cs` (move from existing)
+- `Quaaly/Providers/AzureDevOps/AzureDevOpsSourceControlClient.cs`
+- `Quaaly/Providers/AzureDevOps/AzureDevOpsCommentService.cs`
+- `Quaaly/Providers/AzureDevOps/AzureDevOpsApprovalService.cs`
+- `Quaaly/Providers/AzureDevOps/AzureDevOpsFunctionExecutor.cs` (move from existing)
 
 ### To Be Modified
-- `Quaally/Options/ReviewerOptions.cs` (add SourceProvider property)
-- `Quaally/Program.cs` (update DI)
-- `Quaally/Orchestration/AiOrchestrator.cs` (use Core interfaces)
-- `Quaally/Queue/QueueProcessorHostedService.cs` (use Core models)
-- `Quaally/Orchestration/BotIdentityService.cs` (use Core interfaces)
+- `Quaaly/Options/ReviewerOptions.cs` (add SourceProvider property)
+- `Quaaly/Program.cs` (update DI)
+- `Quaaly/Orchestration/AiOrchestrator.cs` (use Core interfaces)
+- `Quaaly/Queue/QueueProcessorHostedService.cs` (use Core models)
+- `Quaaly/Orchestration/BotIdentityService.cs` (use Core interfaces)
 
 ## Notes
 
