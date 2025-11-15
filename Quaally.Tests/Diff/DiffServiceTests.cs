@@ -1,7 +1,7 @@
-using Quaally.AzureDevOps;
-using Quaally.AzureDevOps.Models;
-using Quaally.Diff;
-using Quaally.Options;
+using Quaally.Infrastructure.AzureDevOps;
+using Quaally.Infrastructure.AzureDevOps.Models;
+using Quaally.Infrastructure.Diff;
+using Quaally.Infrastructure.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.TeamFoundation.SourceControl.WebApi;

@@ -18,7 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Quaally\Quaally.csproj" />
+    <ProjectReference Include="..\Quaally.Core\Quaally.Core.csproj" />
+    <ProjectReference Include="..\Quaally.Data\Quaally.Data.csproj" />
+    <ProjectReference Include="..\Quaally.Infrastructure\Quaally.Infrastructure.csproj" />
+    <ProjectReference Include="..\Quaally.Worker\Quaally.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>

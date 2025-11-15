@@ -1,6 +1,6 @@
-using Quaally.AI;
-using Quaally.AzureDevOps.Models;
-using Quaally.Utils;
+using Quaally.Infrastructure.AI;
+using Quaally.Infrastructure.AzureDevOps.Models;
+using Quaally.Infrastructure.Utils;
 
 namespace Quaally.Tests.AI;
 

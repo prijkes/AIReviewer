@@ -1,4 +1,4 @@
-using Quaally.Options;
+using Quaally.Infrastructure.Options;
 using Microsoft.Extensions.Logging;
 
 namespace Quaally.Tests.Options;

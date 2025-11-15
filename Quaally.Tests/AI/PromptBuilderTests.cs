@@ -1,9 +1,9 @@
-using Quaally.AI;
-using Quaally.AzureDevOps.Models;
-using Quaally.Diff;
-using Quaally.Options;
-using Quaally.Review;
-using Quaally.Utils;
+using Quaally.Infrastructure.AI;
+using Quaally.Infrastructure.AzureDevOps.Models;
+using Quaally.Infrastructure.Diff;
+using Quaally.Infrastructure.Options;
+using Quaally.Infrastructure.Review;
+using Quaally.Infrastructure.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

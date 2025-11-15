@@ -1,8 +1,67 @@
 # Quaally Architecture - Queue-Based Conversational System
 
+## Project Structure
+
+The solution uses a **layered architecture** with clear separation of concerns:
+
+```
+Quaally.sln
+├── Quaally.Core/              # Domain models, interfaces, enums
+│   ├── Models/                # Core domain models (PullRequest, FileChange, etc.)
+│   ├── Interfaces/            # Service interfaces (ISourceControlClient, etc.)
+│   └── Enums/                 # Enumerations (SourceProvider, FileChangeType, etc.)
+│
+├── Quaally.Data/              # Data access and telemetry
+│   └── ReviewMetrics.cs       # Metrics tracking and logging
+│
+├── Quaally.Infrastructure/    # External integrations and utilities
+│   ├── AI/                    # AI client implementations
+│   ├── AzureDevOps/          # Azure DevOps SDK integration
+│   ├── Providers/            # Source provider implementations
+│   ├── Diff/                 # Diff processing
+│   ├── Utils/                # Utilities (logging, settings, etc.)
+│   ├── Policy/               # Review policy loading
+│   ├── Options/              # Configuration options
+│   └── Review/               # Review planning and execution
+│
+├── Quaally.Worker/           # Application entry point
+│   ├── Program.cs            # Main application host
+│   ├── ReviewerHostedService.cs
+│   ├── Queue/                # Queue processing
+│   └── Orchestration/        # AI orchestration
+│
+└── Quaally.Tests/            # Unit tests
+    ├── AI/
+    ├── Diff/
+    ├── Options/
+    └── Utils/
+```
+
+### Layer Dependencies
+
+```
+Quaally.Worker
+    ↓ depends on
+Quaally.Infrastructure
+    ↓ depends on
+Quaally.Core
+    ↑
+Quaally.Data
+    ↓ depends on
+Quaally.Core
+
+Quaally.Tests → references all projects
+```
+
+**Design Principles:**
+- **Core**: No external dependencies, pure domain logic
+- **Data**: Minimal dependencies, focuses on metrics and persistence
+- **Infrastructure**: Implements Core interfaces, contains all external integrations
+- **Worker**: Composition root, hosts the application
+
 ## Overview
 
-Quaally has been refactored from a stateless one-shot reviewer to a **queue-based, conversational AI assistant** with autonomous function calling capabilities.
+Quaally is a **queue-based, conversational AI assistant** with autonomous function calling capabilities for pull request code reviews.
 
 ## High-Level Architecture
 
@@ -366,19 +425,6 @@ MaxWaitTimeSeconds = 30            # Max wait for messages
 1. Implement `ChatClient` interface
 2. Update service registration in `Program.cs`
 3. Ensure function calling compatibility
-
-## Comparison: Before vs After
-
-| Aspect | Before (One-Shot) | After (Queue-Based) |
-|--------|------------------|---------------------|
-| **Trigger** | Azure Pipeline | @mention in PR comment |
-| **Execution** | Single review pass | Conversational, multi-turn |
-| **Interactivity** | None | Full conversation |
-| **Functions** | 5 (read-only) | 20 (read + write) |
-| **Approval** | Manual only | AI can approve |
-| **Thread Management** | No | Yes |
-| **Context Awareness** | PR snapshot | Full history + context |
-| **Flexibility** | Fixed workflow | Adaptive to requests |
 
 ## Future Enhancements
 

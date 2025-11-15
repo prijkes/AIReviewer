@@ -1,4 +1,4 @@
-using Quaally.Utils;
+using Quaally.Infrastructure.Utils;
 
 namespace Quaally.Tests.Utils;
 

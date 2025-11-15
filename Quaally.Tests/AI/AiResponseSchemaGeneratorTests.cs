@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Quaally.AI;
+using Quaally.Infrastructure.AI;
 
 namespace Quaally.Tests.AI;
 

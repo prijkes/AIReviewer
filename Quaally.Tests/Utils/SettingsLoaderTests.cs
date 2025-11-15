@@ -1,5 +1,5 @@
-using Quaally.Options;
-using Quaally.Utils;
+using Quaally.Infrastructure.Options;
+using Quaally.Infrastructure.Utils;
 
 namespace Quaally.Tests.Utils;
 

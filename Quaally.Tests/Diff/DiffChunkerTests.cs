@@ -1,4 +1,4 @@
-using Quaally.Diff;
+using Quaally.Infrastructure.Diff;
 using Microsoft.Extensions.Logging;
 
 namespace Quaally.Tests.Diff;

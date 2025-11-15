@@ -1,41 +1,20 @@
-# Quaally - Queue-Based Conversational AI Code Reviewer
+# Quaally - Conversational AI Code Reviewer
 
-An AI-powered, conversational code review assistant supporting **multiple source control providers**. Quaally operates as a queue-based service that responds to @mentions in PR comments, providing intelligent code reviews with autonomous function calling capabilities.
+**QUallity Assurance AnLLYzer** - An AI-powered, conversational code review assistant for pull requests. Quaally operates as a queue-based service that responds to @mentions in PR comments, providing intelligent code reviews with autonomous function calling capabilities.
 
-**✨ Now with Multi-Provider Support!** Currently supports Azure DevOps, with GitHub and GitLab support coming soon.
+Supports **Azure DevOps** with extensible architecture for GitHub, GitLab, and other providers.
 
-## 🎯 What's New
+## 🎯 Key Features
 
-### Multi-Provider Architecture (NEW!)
-
-Quaally has been refactored to support multiple source control providers:
-
-- **🔌 Provider-Agnostic**: Clean architecture separating business logic from provider specifics
-- **📦 Modular Design**: Easy to add new providers (GitHub, GitLab, Bitbucket)
-- **⚙️ Configurable**: Switch providers via configuration
-- **🔄 Extensible**: Adding a new provider requires implementing just 3 interfaces
-- **🛡️ Backward Compatible**: Existing Azure DevOps setups work without changes
-
-### Queue-Based Architecture
-
-Quaally has been completely refactored to provide a **conversational, on-demand** code review experience:
-
-- **💬 Conversational Interface**: @mention the bot in any PR comment to start a conversation
+- **💬 Conversational Interface**: @mention the bot in any PR comment to interact naturally
 - **🤖 Autonomous Function Calling**: AI can call 20+ functions to manage PRs, review code, and more
-- **🔄 Multi-Turn Conversations**: Maintain context across multiple exchanges
-- **⚡ Event-Driven**: Triggered by Azure Service Bus queue, not pipeline runs
+- **🔄 Multi-Turn Conversations**: Maintains context across multiple exchanges in thread discussions
+- **⚡ Event-Driven**: Triggered by Azure Service Bus queue for scalable, reliable processing
 - **🎭 Context-Aware**: Remembers thread history for intelligent follow-ups
 - **🛠️ Full PR Management**: Can approve, merge, create threads, and manage the entire PR lifecycle
-
-### Before vs After
-
-| Feature | Old (Pipeline-Based) | New (Queue-Based) |
-|---------|---------------------|-------------------|
-| **Trigger** | Azure Pipeline on PR update | @mention in PR comments |
-| **Interaction** | One-shot review | Conversational, multi-turn |
-| **Capabilities** | Read & analyze only | Read, write, approve, merge |
-| **Functions** | 5 code analysis functions | 20+ PR management functions |
-| **Flexibility** | Fixed workflow | Adaptive to user requests |
+- **🔌 Provider-Agnostic**: Clean architecture separating business logic from provider specifics
+- **📦 Modular Design**: Easy to add new providers through interface implementation
+- **⚙️ Configurable**: Flexible configuration system with settings file and environment variables
 
 ## 🚀 Quick Start
 
@@ -58,7 +37,7 @@ See **[QUEUE_SETUP_GUIDE.md](QUEUE_SETUP_GUIDE.md)** for detailed instructions.
 
 ### Step 2: Configure Application
 
-Create `.env` file in `Quaally/` directory:
+Create `.env` file in `Quaally.Worker/` directory:
 
 ```ini
 # Azure DevOps
@@ -72,11 +51,11 @@ LOCAL_REPO_PATH=/path/to/local/repo/clone
 AI_FOUNDRY_ENDPOINT=https://your-endpoint.openai.azure.com/
 AI_FOUNDRY_API_KEY=your-api-key
 
-# Azure Service Bus (NEW!)
+# Azure Service Bus
 ServiceBusConnectionString=Endpoint=sb://...
 ```
 
-Update `Quaally/settings.ini`:
+Update `Quaally.Worker/settings.ini`:
 
 ```ini
 [Queue]
@@ -89,7 +68,7 @@ MaxWaitTimeSeconds = 30
 ### Step 3: Run the Application
 
 ```bash
-cd Quaally
+cd Quaally.Worker
 dotnet build
 dotnet run --env .env
 ```
@@ -143,7 +122,7 @@ User in thread: @Quaally I've fixed this, please check
 Bot: (reviews fix, closes thread if satisfied)
 ```
 
-### Ask the Bot to Help
+### Search Codebase
 ```
 @Quaally can you find all usages of the IPaymentService interface?
 ```
@@ -189,12 +168,7 @@ The AI can autonomously call these 20 functions:
 - **[QUEUE_SETUP_GUIDE.md](QUEUE_SETUP_GUIDE.md)** - Complete setup instructions
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
 - **[FUNCTION_CALLING.md](FUNCTION_CALLING.md)** - Function calling internals
-- **[PIPELINE.md](PIPELINE.md)** - Legacy pipeline-based setup (deprecated)
-
-### Multi-Provider Documentation (NEW!)
-- **[REFACTORING.md](REFACTORING.md)** - Multi-provider architecture guide
-- **[REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)** - Implementation roadmap
-- **[COMPLETION_SUMMARY.md](COMPLETION_SUMMARY.md)** - Completion status and usage
+- **[LANGUAGE_SPECIFIC_POLICIES.md](LANGUAGE_SPECIFIC_POLICIES.md)** - Code review policies
 
 ## ⚙️ Configuration
 
@@ -215,7 +189,7 @@ MaxTokens = 4000
 
 [FunctionCalling]
 Enabled = true
-MaxCalls = 10
+MaxConversationIterations = 10
 
 [Queue]
 QueueName = Quaally-events
@@ -225,7 +199,7 @@ MaxConcurrentCalls = 5
 
 **Environment (.env):**
 ```ini
-# Source Control Provider (optional, defaults to AzureDevOps)
+# Source Control Provider (defaults to AzureDevOps)
 SOURCE_PROVIDER=AzureDevOps
 
 # Azure DevOps Configuration
@@ -233,14 +207,6 @@ ServiceBusConnectionString=Endpoint=sb://...
 AI_FOUNDRY_ENDPOINT=https://...
 AI_FOUNDRY_API_KEY=...
 ADO_ACCESS_TOKEN=...
-
-# For future GitHub support:
-# SOURCE_PROVIDER=GitHub
-# GITHUB_TOKEN=your_github_token
-
-# For future GitLab support:
-# SOURCE_PROVIDER=GitLab
-# GITLAB_TOKEN=your_gitlab_token
 ```
 
 ## 🏗️ Architecture
@@ -257,6 +223,17 @@ AiOrchestrator (builds context + calls AI)
 AzureDevOpsFunctionExecutor (executes functions)
     ↓
 Azure DevOps API (posts results)
+```
+
+### Project Structure
+
+```
+Quaally.sln
+├── Quaally.Core/              # Domain models, interfaces, enums
+├── Quaally.Data/              # Data access and telemetry
+├── Quaally.Infrastructure/    # External integrations and utilities
+├── Quaally.Worker/           # Application entry point
+└── Quaally.Tests/            # Unit tests
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed diagrams and explanations.
@@ -290,14 +267,13 @@ info: Successfully replied to comment in thread 456
 ### Optimization Tips
 1. Use smaller models (gpt-4o-mini vs gpt-4o)
 2. Adjust `MaxTokens` in settings
-3. Limit `MaxFilesToReview`
-4. Monitor token usage in logs
+3. Monitor token usage in logs
 
 ## 🔒 Security
 
 - **Credentials**: Stored in environment variables (never in code)
 - **Authentication**: Azure DefaultAzureCredential for OpenAI, PAT for Azure DevOps
-- **Permissions**: Bot can only act with PAT permissions (principle of least privilege)
+- **Permissions**: Bot acts only with configured PAT permissions (principle of least privilege)
 - **Data**: All communication over HTTPS
 - **Sandboxing**: Function execution is controlled and logged
 
@@ -313,7 +289,7 @@ info: Successfully replied to comment in thread 456
 
 ### "ServiceBusConnectionString not set"
 
-- Ensure `.env` file exists in `Quaally/` directory
+- Ensure `.env` file exists in `Quaally.Worker/` directory
 - Verify `ServiceBusConnectionString` is in `.env`
 - Try running with `dotnet run --env .env`
 
@@ -331,16 +307,19 @@ info: Successfully replied to comment in thread 456
 
 ## 🌐 Multi-Provider Support
 
-### Currently Supported Providers
+### Supported Providers
 
 - ✅ **Azure DevOps** - Full support (all 20+ functions)
-- 🔄 **GitHub** - Coming soon
-- 🔄 **GitLab** - Coming soon
+
+### Planned Providers
+
+- 🔄 **GitHub** - In development
+- 🔄 **GitLab** - Planned
 - 🔄 **Bitbucket** - Planned
 
-### How It Works
+### Provider Architecture
 
-Quaally uses a **provider-agnostic architecture**:
+Quaally uses a provider-agnostic architecture:
 
 ```
 ┌─────────────────────────────────┐
@@ -363,9 +342,6 @@ To add support for a new provider:
 2. Implement `ICommentService` interface
 3. Implement `IApprovalService` interface
 4. Register in `Program.cs` dependency injection
-5. Done!
-
-See **[REFACTORING.md](REFACTORING.md)** for detailed instructions.
 
 ### Selecting a Provider
 
@@ -394,8 +370,8 @@ dotnet run --env .env
 
 ### Option 2: Azure Container Instance
 ```bash
-docker build -t Quaally .
-docker run -e ServiceBusConnectionString="..." Quaally
+docker build -t quaally .
+docker run -e ServiceBusConnectionString="..." quaally
 ```
 
 ### Option 3: Azure App Service
@@ -404,40 +380,22 @@ Deploy as a worker process (no HTTP endpoints needed)
 ### Option 4: Self-Hosted Server
 Run as systemd service (Linux) or Windows Service
 
-## 🔄 Migration from Pipeline-Based
-
-If you're migrating from the old pipeline-based system:
-
-1. ✅ Complete queue setup (see QUEUE_SETUP_GUIDE.md)
-2. ✅ Update .env with ServiceBusConnectionString
-3. ✅ Add [Queue] section to settings.ini
-4. ✅ Remove old Azure Pipeline trigger (optional - can coexist)
-5. ✅ Test with @mentions in PR comments
-
-The old pipeline-based approach still works, but the queue-based system offers much more flexibility and interactivity.
-
 ## 📈 Roadmap
 
-### Multi-Provider Support
-- [x] Core abstraction layer
-- [x] Azure DevOps provider implementation
-- [ ] GitHub provider
-- [ ] GitLab provider
-- [ ] Bitbucket provider
-- [ ] Multi-provider deployments (run multiple providers simultaneously)
+### Future Features
+- Persistent conversation memory across sessions
+- Build/test status integration
+- Code owners awareness
+- Multi-repository support
+- Analytics dashboard
+- Additional provider support (GitHub, GitLab, Bitbucket)
+- Multi-provider deployments (run multiple providers simultaneously)
 
-### Planned Features
-- [ ] Persistent conversation memory across sessions
-- [ ] Build/test status integration
-- [ ] Code owners awareness
-- [ ] Multi-repository support
-- [ ] Analytics dashboard
-
-### Nice-to-Have
-- [ ] Slack/Teams notifications
-- [ ] Scheduled PR reviews
-- [ ] Custom review templates
-- [ ] Machine learning feedback loop
+### Potential Additions
+- Slack/Teams notifications
+- Scheduled PR reviews
+- Custom review templates
+- Machine learning feedback loop
 
 ## 🤝 Contributing
 

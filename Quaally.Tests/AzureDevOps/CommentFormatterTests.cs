@@ -1,6 +1,6 @@
-using Quaally.AzureDevOps;
-using Quaally.AzureDevOps.Models;
-using Quaally.Review;
+using Quaally.Infrastructure.AzureDevOps;
+using Quaally.Infrastructure.AzureDevOps.Models;
+using Quaally.Infrastructure.Review;
 
 namespace Quaally.Tests.AzureDevOps;
 
