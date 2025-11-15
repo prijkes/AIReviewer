@@ -1,10 +1,10 @@
 # Pipeline Environment Variables
 
-This document describes the **dynamic environment variables** that must be set when running AIReviewer. These values change per execution and should **NOT** be in `settings.ini`.
+This document describes the **dynamic environment variables** that must be set when running Quaally. These values change per execution and should **NOT** be in `settings.ini`.
 
 ## Overview
 
-AIReviewer requires two types of configuration:
+Quaally requires two types of configuration:
 
 1. **Static Settings** → Configured in `settings.ini`
    - Default AI model parameters
@@ -31,7 +31,7 @@ AIReviewer requires two types of configuration:
 
 ## Required Environment Variables
 
-These variables **MUST** be set every time AIReviewer runs.
+These variables **MUST** be set every time Quaally runs.
 
 ### Azure DevOps Connection
 
@@ -185,7 +185,7 @@ variables:
 export ADO_PR_ID=123
 ```
 
-**Auto-detection:** If not set, AIReviewer attempts to infer from `BUILD_SOURCE_VERSION`.
+**Auto-detection:** If not set, Quaally attempts to infer from `BUILD_SOURCE_VERSION`.
 
 ---
 
@@ -379,7 +379,7 @@ variables:
 
 steps:
   - script: |
-      cd $(Build.SourcesDirectory)/AIReviewer
+      cd $(Build.SourcesDirectory)/Quaally
       dotnet run
     displayName: 'Run AI Reviewer'
 ```
@@ -412,7 +412,7 @@ FILES_MAXFILESTOREVIEW=100
 Then run:
 ```bash
 # Load .env file (if using direnv or similar)
-dotnet run --project AIReviewer/AIReviewer.csproj
+dotnet run --project Quaally/Quaally.csproj
 ```
 
 ---
@@ -473,7 +473,7 @@ echo $LOCAL_REPO_PATH
 **Solution:** 
 ```bash
 # settings.ini must be in same directory as the executable
-cd AIReviewer  # or wherever settings.ini is located
+cd Quaally  # or wherever settings.ini is located
 dotnet run
 ```
 
@@ -504,7 +504,7 @@ dotnet run
 
 ### Azure Pipelines
 
-AIReviewer is designed to run in Azure Pipelines as a PR validation step:
+Quaally is designed to run in Azure Pipelines as a PR validation step:
 
 ```yaml
 trigger: none  # Only run on PR
@@ -521,7 +521,7 @@ steps:
       version: '8.x'
   
   - script: |
-      dotnet run --project AIReviewer/AIReviewer.csproj
+      dotnet run --project Quaally/Quaally.csproj
     env:
       ADO_ACCESS_TOKEN: $(System.AccessToken)
       AI_FOUNDRY_ENDPOINT: $(AI_ENDPOINT)
@@ -553,7 +553,7 @@ jobs:
           ADO_PROJECT: ${{ secrets.ADO_PROJECT }}
           # ... other variables
         run: |
-          cd AIReviewer
+          cd Quaally
           dotnet run
 ```
 

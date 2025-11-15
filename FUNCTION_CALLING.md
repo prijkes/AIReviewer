@@ -249,4 +249,4 @@ When adding new functions:
 
 ## License
 
-Same as the main AIReviewer project.
+Same as the main Quaally project.

@@ -1,408 +1,466 @@
-# AIReviewer
+# Quaally - Queue-Based Conversational AI Code Reviewer
 
-An AI-powered code review bot for Azure DevOps pull requests. AIReviewer automatically analyzes code changes, identifies issues, and provides actionable feedback using Azure OpenAI.
+An AI-powered, conversational code review assistant supporting **multiple source control providers**. Quaally operates as a queue-based service that responds to @mentions in PR comments, providing intelligent code reviews with autonomous function calling capabilities.
 
-## What Does AIReviewer Do?
+**✨ Now with Multi-Provider Support!** Currently supports Azure DevOps, with GitHub and GitLab support coming soon.
 
-AIReviewer integrates with your Azure DevOps pull request workflow to provide automated code reviews. It:
+## 🎯 What's New
 
-- **Analyzes Code Changes**: Reviews file diffs in pull requests against your custom policy guidelines
-- **Reviews PR Metadata**: Checks PR titles, descriptions, and commit messages for completeness and quality
-- **Posts Actionable Comments**: Creates threaded comments on specific lines with clear recommendations
-- **Provides Approvals**: Automatically approves or waits based on error/warning thresholds
-- **Tracks Issues**: Maintains issue fingerprints across PR iterations to avoid duplicate comments
-- **Supports Custom Policies**: Uses markdown policy files to define your team's review standards
-- **Multi-Language Support**: Automatically detects and responds in English or Japanese based on PR description
+### Multi-Provider Architecture (NEW!)
 
-## Prerequisites
+Quaally has been refactored to support multiple source control providers:
 
+- **🔌 Provider-Agnostic**: Clean architecture separating business logic from provider specifics
+- **📦 Modular Design**: Easy to add new providers (GitHub, GitLab, Bitbucket)
+- **⚙️ Configurable**: Switch providers via configuration
+- **🔄 Extensible**: Adding a new provider requires implementing just 3 interfaces
+- **🛡️ Backward Compatible**: Existing Azure DevOps setups work without changes
+
+### Queue-Based Architecture
+
+Quaally has been completely refactored to provide a **conversational, on-demand** code review experience:
+
+- **💬 Conversational Interface**: @mention the bot in any PR comment to start a conversation
+- **🤖 Autonomous Function Calling**: AI can call 20+ functions to manage PRs, review code, and more
+- **🔄 Multi-Turn Conversations**: Maintain context across multiple exchanges
+- **⚡ Event-Driven**: Triggered by Azure Service Bus queue, not pipeline runs
+- **🎭 Context-Aware**: Remembers thread history for intelligent follow-ups
+- **🛠️ Full PR Management**: Can approve, merge, create threads, and manage the entire PR lifecycle
+
+### Before vs After
+
+| Feature | Old (Pipeline-Based) | New (Queue-Based) |
+|---------|---------------------|-------------------|
+| **Trigger** | Azure Pipeline on PR update | @mention in PR comments |
+| **Interaction** | One-shot review | Conversational, multi-turn |
+| **Capabilities** | Read & analyze only | Read, write, approve, merge |
+| **Functions** | 5 code analysis functions | 20+ PR management functions |
+| **Flexibility** | Fixed workflow | Adaptive to user requests |
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Azure subscription (for Service Bus & Azure OpenAI)
+- Azure DevOps project with repository
 - .NET 8.0 SDK
-- Azure DevOps organization with a repository
-- Azure OpenAI or AI Foundry endpoint with API access
-- Azure DevOps Personal Access Token (PAT) with code review permissions
+- Personal Access Token with Code & PR permissions
 
-## Quick Start
+### Step 1: Setup Azure Service Bus
 
-### Running Locally
+See **[QUEUE_SETUP_GUIDE.md](QUEUE_SETUP_GUIDE.md)** for detailed instructions.
 
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd AIReviewer
-   ```
+**Quick version:**
+1. Create Azure Service Bus namespace (Basic tier)
+2. Create queue named `Quaally-events`
+3. Get connection string
+4. Configure Azure DevOps webhook (Pull request commented on → Service Bus)
 
-2. **Set required environment variables**
-   ```bash
-   # Azure DevOps Configuration
-   export ADO_COLLECTION_URL="https://dev.azure.com/YourOrg"
-   export ADO_PROJECT="YourProject"
-   export ADO_REPO_NAME="YourRepo"  # or use ADO_REPO_ID
-   export ADO_PR_ID="123"
-   export ADO_ACCESS_TOKEN="your-pat-token"
+### Step 2: Configure Application
 
-   # Azure AI Configuration
-   export AI_FOUNDRY_ENDPOINT="https://your-endpoint.openai.azure.com"
-   export AI_FOUNDRY_API_KEY="your-api-key"
-   export AI_FOUNDRY_DEPLOYMENT="gpt-4o"  # or your model deployment name
+Create `.env` file in `Quaally/` directory:
 
-   # Policy File
-   export POLICY_PATH="./policy/review-policy.md"
-   ```
-
-3. **Create a policy file** (e.g., `policy/review-policy.md`)
-   ```markdown
-   # Code Review Policy
-
-   ## Security
-   - Check for SQL injection vulnerabilities
-   - Verify proper authentication/authorization
-   - Ensure sensitive data is not logged
-
-   ## Code Quality
-   - Follow naming conventions
-   - Maintain proper error handling
-   - Add unit tests for new functionality
-   ```
-
-4. **Run the reviewer**
-   ```bash
-   dotnet run --project AIReviewer/AIReviewer.csproj
-   ```
-
-### Command Line Options
-
-AIReviewer supports command-line arguments for specifying custom configuration file paths using the official Microsoft `System.CommandLine` library.
-
-```bash
-# View help
-dotnet run --project AIReviewer/AIReviewer.csproj -- --help
-
-# Use default settings.ini and no .env file
-dotnet run --project AIReviewer/AIReviewer.csproj
-
-# Specify custom settings.ini path
-dotnet run --project AIReviewer/AIReviewer.csproj -- --settings /path/to/settings.ini
-
-# Specify custom .env file path
-dotnet run --project AIReviewer/AIReviewer.csproj -- --env /path/to/.env
-
-# Specify both custom settings and env file
-dotnet run --project AIReviewer/AIReviewer.csproj -- --settings config/prod.ini --env config/.env.prod
-```
-
-**Available Options:**
-- `-s, --settings <path>`: Path to settings.ini file (default: `settings.ini`)
-- `-e, --env <path>`: Path to .env file to load (optional)
-- `-h, --help`: Show help message and exit
-
-**Use Cases:**
-- **Multiple Environments**: Use different settings files for dev/staging/production
-- **Shared Configurations**: Point to a centralized settings file on a network drive
-- **Testing**: Use test-specific settings and environment variables
-- **CI/CD**: Load environment-specific configurations based on build parameters
-
-**Examples:**
-```bash
-# Development environment
-dotnet run -- -s config/dev.ini -e config/.env.dev
-
-# Production environment  
-dotnet run -- -s config/prod.ini -e config/.env.prod
-
-# Testing with custom settings only
-dotnet run -- --settings test-settings.ini
-
-# Load .env from a different directory
-dotnet run -- --env /secure/credentials/.env
-```
-
-### Running in Azure Pipelines
-
-Add the provided `azure-pipeline.yaml` to your repository and configure the required pipeline variables (see Configuration section below).
-
-## Configuration
-
-AIReviewer uses a self-documenting configuration system:
-
-1. **settings.ini** - Static defaults with detailed inline documentation (version controlled)
-2. **Environment variables** - Override defaults + provide dynamic values (highest priority)
-3. **.env file** - Local development overrides (gitignored)
-
-### Quick Start Configuration
-
-**Step 1:** Review and customize `AIReviewer/settings.ini`
 ```ini
-[AI]
-Deployment = o4-mini    # Change to gpt-4 for better quality
-Temperature = 0.2       # Keep low for consistent reviews
-MaxTokens = 2000        # Increase for more detailed feedback
-
-[Review]
-DryRun = false         # Set to true for testing
-WarnBudget = 3         # Adjust based on your standards
-
-# ... see settings.ini for all options with detailed explanations
-```
-
-**Step 2:** Set required environment variables (copy from `.env.example`):
-```bash
 # Azure DevOps
-ADO_COLLECTION_URL=https://dev.azure.com/MyOrg
-ADO_PROJECT=MyProject
-ADO_REPO_NAME=MyRepo
+ADO_COLLECTION_URL=https://dev.azure.com/your-org
+ADO_PROJECT=YourProject
+ADO_REPO_ID=your-repo-guid
 ADO_ACCESS_TOKEN=your-pat-token
+LOCAL_REPO_PATH=/path/to/local/repo/clone
 
 # Azure AI
-AI_FOUNDRY_ENDPOINT=https://your-endpoint.openai.azure.com
+AI_FOUNDRY_ENDPOINT=https://your-endpoint.openai.azure.com/
 AI_FOUNDRY_API_KEY=your-api-key
 
-# Local Repository
-LOCAL_REPO_PATH=/path/to/your/repo
+# Azure Service Bus (NEW!)
+ServiceBusConnectionString=Endpoint=sb://...
 ```
 
-### 📖 Configuration Documentation
+Update `Quaally/settings.ini`:
 
-- **`AIReviewer/settings.ini`** - All static settings with detailed inline comments
-  - Every setting explained right where it's configured
-  - Includes default values, valid ranges, cost impacts, and guidelines
-  - Edit without recompiling - just restart the application
-
-- **[PIPELINE.md](PIPELINE.md)** - Environment variable reference
-  - Required variables for Azure DevOps and AI
-  - Azure Pipeline integration examples
-  - Security best practices
-  - Override patterns for settings.ini values
-
-- **[.env.example](AIReviewer/.env.example)** - Local development template
-  - Copy to `.env` for local development
-  - Gitignored to protect secrets
-
-### Key Configuration Benefits
-
-✅ **Self-Documenting** - All settings explained in settings.ini  
-✅ **No Recompilation** - Edit settings.ini and restart  
-✅ **Secure** - Secrets only in environment variables  
-✅ **Flexible** - Override any setting via environment  
-✅ **Version Controlled** - Track default changes in git
-
-## Policy Files
-
-Policy files are written in markdown and define your review standards. The AI uses these as guidelines when reviewing code.
-
-### Example Policy Structure
-
-```markdown
-# Code Review Policy
-
-## Security
-- Validate all user inputs
-- Use parameterized queries to prevent SQL injection
-- Never log sensitive information (passwords, tokens, PII)
-- Ensure proper authentication and authorization checks
-
-## C# Best Practices
-- Follow Microsoft naming conventions
-- Use `async`/`await` for I/O operations
-- Dispose of `IDisposable` resources properly
-- Avoid catching generic `Exception` unless re-throwing
-
-## Testing
-- Add unit tests for new functionality
-- Maintain test coverage above 80%
-- Mock external dependencies in tests
-
-## Performance
-- Avoid N+1 queries
-- Use appropriate collection types
-- Cache expensive operations when possible
-
-## Code Quality
-- Keep methods under 50 lines
-- Limit class complexity
-- Remove dead code and commented-out code
-- Add XML documentation for public APIs
+```ini
+[Queue]
+QueueName = Quaally-events
+BotDisplayName = Quaally
+MaxConcurrentCalls = 5
+MaxWaitTimeSeconds = 30
 ```
 
-**Tips for Writing Policies:**
-- Be specific and actionable
-- Use markdown formatting (headers, lists, code blocks)
-- Focus on your team's actual priorities
-- Include code examples where helpful
-- Organize by category (Security, Performance, etc.)
+### Step 3: Run the Application
 
-## Language Detection
-
-AIReviewer automatically detects the primary language of your PR based on the PR description and provides review feedback in that language.
-
-### Supported Languages
-
-- **English (en)**: Default language
-- **Japanese (ja)**: Detected when PR description contains significant Japanese characters (Hiragana, Katakana, Kanji)
-
-### How Detection Works
-
-1. The system analyzes the PR description text
-2. Counts Japanese characters (Hiragana, Katakana, Kanji, Fullwidth forms)
-3. If more than 30% of non-whitespace characters are Japanese, reviews are conducted in Japanese
-4. Otherwise, reviews default to English
-
-### Example
-
-**PR with English description:**
-```
-Fix authentication bug in user login flow
-
-This PR addresses an issue where users were unable to log in...
-```
-→ Reviews provided in **English**
-
-**PR with Japanese description:**
-```
-ユーザーログインフローの認証バグを修正
-
-このPRでは、ユーザーがログインできなかった問題に対処します...
-```
-→ Reviews provided in **Japanese** (日本語)
-
-The detected language applies to:
-- Code review comments
-- PR metadata review feedback
-- All issue titles, rationales, and recommendations
-
-## Understanding Review Results
-
-### Issue Severities
-
-- **Error**: Critical issues that must be fixed (blocks approval)
-- **Warning**: Issues that should be addressed but don't block approval (up to `WARN_BUDGET`)
-
-### Issue Categories
-
-Issues are automatically categorized:
-- `Security`: Security vulnerabilities or concerns
-- `Performance`: Performance anti-patterns
-- `CodeQuality`: Code maintainability and readability
-- `BestPractice`: Framework/language best practices
-- `Testing`: Test-related issues
-
-### Approval Logic
-
-The bot automatically sets its vote based on review results:
-- **Approve (10)**: No errors AND warnings ≤ `WARN_BUDGET`
-- **Wait for Author (0)**: Has errors OR warnings > `WARN_BUDGET`
-
-## Cost Management
-
-AIReviewer makes API calls to Azure OpenAI, which incurs costs. Use these strategies to manage expenses:
-
-### 1. Adjust Review Limits
 ```bash
-# Review fewer files per PR
-export MAX_FILES_TO_REVIEW=25
-
-# Report fewer issues per file
-export MAX_ISSUES_PER_FILE=3
-
-# Reduce diff size sent to AI
-export MAX_PROMPT_DIFF_BYTES=4000
+cd Quaally
+dotnet build
+dotnet run --env .env
 ```
 
-### 2. Use Smaller Models
+Expected output:
+```
+info: Queue Processor started successfully. Listening on queue: Quaally-events
+```
+
+### Step 4: Test It!
+
+1. Create a PR in Azure DevOps
+2. Add a comment: `@Quaally please review this PR`
+3. Watch the bot respond with a review!
+
+## 💡 Usage Examples
+
+### Code Review
+```
+@Quaally please review this PR for code quality and security issues
+```
+
+The AI will:
+1. Get list of changed files
+2. Read file contents
+3. Analyze the code
+4. Create inline comment threads for issues found
+5. Reply with summary
+
+### Specific File Review
+```
+@Quaally can you review the changes in Program.cs?
+```
+
+### Explain Code
+```
+@Quaally please explain what the ProcessMessage method does
+```
+
+### Approve PR
+```
+@Quaally if everything looks good, please approve this PR
+```
+
+### Continue Conversation
+```
+User: @Quaally review this
+Bot: (creates thread on line 42)
+User: (fixes code)
+User in thread: @Quaally I've fixed this, please check
+Bot: (reviews fix, closes thread if satisfied)
+```
+
+### Ask the Bot to Help
+```
+@Quaally can you find all usages of the IPaymentService interface?
+```
+
+## 🛠️ Available Functions
+
+The AI can autonomously call these 20 functions:
+
+### Thread & Comment Management
+- `create_pr_comment_thread` - Create inline comments on code
+- `reply_to_thread` - Continue conversations in threads
+- `update_thread_status` - Mark threads as fixed/closed/active
+- `get_thread_conversation` - View full thread history
+
+### PR Status & Approval
+- `approve_pull_request` - Vote on PR (-10 to +10)
+- `complete_pull_request` - Merge the PR
+- `abandon_pull_request` - Close without merging
+- `set_auto_complete` - Enable auto-merge
+
+### PR Management
+- `add_reviewer` - Add required/optional reviewers
+- `update_pr_description` - Improve PR descriptions
+- `add_pr_label` - Tag PRs (placeholder)
+
+### PR Information
+- `get_pr_files` - List changed files
+- `get_pr_diff` - Get file diffs
+- `get_commit_details` - Inspect commits
+- `get_pr_commits` - List all commits
+- `get_pr_work_items` - View linked work items
+
+### Code Analysis
+- `get_full_file_content` - Read complete files
+- `get_file_at_commit` - View file at specific version
+- `search_codebase` - Find code patterns/classes/methods
+- `get_related_files` - Discover related files
+- `get_file_history` - View commit history
+
+## 📚 Documentation
+
+### Setup & Configuration
+- **[QUEUE_SETUP_GUIDE.md](QUEUE_SETUP_GUIDE.md)** - Complete setup instructions
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design
+- **[FUNCTION_CALLING.md](FUNCTION_CALLING.md)** - Function calling internals
+- **[PIPELINE.md](PIPELINE.md)** - Legacy pipeline-based setup (deprecated)
+
+### Multi-Provider Documentation (NEW!)
+- **[REFACTORING.md](REFACTORING.md)** - Multi-provider architecture guide
+- **[REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)** - Implementation roadmap
+- **[COMPLETION_SUMMARY.md](COMPLETION_SUMMARY.md)** - Completion status and usage
+
+## ⚙️ Configuration
+
+Quaally uses a layered configuration system:
+
+1. **settings.ini** - Static defaults with inline documentation
+2. **Environment variables** - Dynamic values and secrets
+3. **.env file** - Local development (gitignored)
+
+### Key Settings
+
+**settings.ini:**
+```ini
+[AI]
+Deployment = gpt-4o
+Temperature = 0.2
+MaxTokens = 4000
+
+[FunctionCalling]
+Enabled = true
+MaxCalls = 10
+
+[Queue]
+QueueName = Quaally-events
+BotDisplayName = Quaally
+MaxConcurrentCalls = 5
+```
+
+**Environment (.env):**
+```ini
+# Source Control Provider (optional, defaults to AzureDevOps)
+SOURCE_PROVIDER=AzureDevOps
+
+# Azure DevOps Configuration
+ServiceBusConnectionString=Endpoint=sb://...
+AI_FOUNDRY_ENDPOINT=https://...
+AI_FOUNDRY_API_KEY=...
+ADO_ACCESS_TOKEN=...
+
+# For future GitHub support:
+# SOURCE_PROVIDER=GitHub
+# GITHUB_TOKEN=your_github_token
+
+# For future GitLab support:
+# SOURCE_PROVIDER=GitLab
+# GITLAB_TOKEN=your_gitlab_token
+```
+
+## 🏗️ Architecture
+
+```
+Azure DevOps PR Comment (@Quaally)
+    ↓
+Azure Service Bus Queue
+    ↓
+QueueProcessorHostedService
+    ↓
+AiOrchestrator (builds context + calls AI)
+    ↓
+AzureDevOpsFunctionExecutor (executes functions)
+    ↓
+Azure DevOps API (posts results)
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed diagrams and explanations.
+
+## 📊 Monitoring
+
+### Azure Portal
+- Monitor queue depth (should be near 0)
+- Watch for dead-letter messages (should stay at 0)
+- Track message processing metrics
+
+### Application Logs
+```
+info: Processing message abc-123 (Delivery count: 1)
+info: Executing function: get_pr_files
+info: Executing function: get_full_file_content
+info: Successfully replied to comment in thread 456
+```
+
+## 💰 Cost Management
+
+### Azure Service Bus
+- Basic tier: ~$0.05 per million operations
+- Typical usage: <100 messages/day = negligible cost
+
+### Azure OpenAI
+- Varies by model and usage
+- Estimated: $0.01-0.10 per PR review
+- Budget: ~$10-30/month for moderate usage
+
+### Optimization Tips
+1. Use smaller models (gpt-4o-mini vs gpt-4o)
+2. Adjust `MaxTokens` in settings
+3. Limit `MaxFilesToReview`
+4. Monitor token usage in logs
+
+## 🔒 Security
+
+- **Credentials**: Stored in environment variables (never in code)
+- **Authentication**: Azure DefaultAzureCredential for OpenAI, PAT for Azure DevOps
+- **Permissions**: Bot can only act with PAT permissions (principle of least privilege)
+- **Data**: All communication over HTTPS
+- **Sandboxing**: Function execution is controlled and logged
+
+## 🧪 Troubleshooting
+
+### Bot Doesn't Respond
+
+**Check:**
+1. Is application running? (`dotnet run`)
+2. Are messages arriving in queue? (Azure Portal → Service Bus → Queue)
+3. Check application logs for errors
+4. Verify Service Bus connection string
+
+### "ServiceBusConnectionString not set"
+
+- Ensure `.env` file exists in `Quaally/` directory
+- Verify `ServiceBusConnectionString` is in `.env`
+- Try running with `dotnet run --env .env`
+
+### Bot Mentions Not Detected
+
+- Verify `BotDisplayName` in `settings.ini` matches your @mention
+- Try both `@Quaally` and `@<Quaally>`
+- Check application logs for "Bot not mentioned" messages
+
+### Messages in Dead-Letter Queue
+
+1. Check application logs for processing errors
+2. Fix the underlying issue
+3. Resubmit from dead-letter queue or wait for new events
+
+## 🌐 Multi-Provider Support
+
+### Currently Supported Providers
+
+- ✅ **Azure DevOps** - Full support (all 20+ functions)
+- 🔄 **GitHub** - Coming soon
+- 🔄 **GitLab** - Coming soon
+- 🔄 **Bitbucket** - Planned
+
+### How It Works
+
+Quaally uses a **provider-agnostic architecture**:
+
+```
+┌─────────────────────────────────┐
+│   Core Interfaces               │  ← Provider-agnostic
+│   (ISourceControlClient, etc.)  │
+└──────────┬──────────────────────┘
+           │ Implemented by
+           ▼
+┌─────────────────────────────────┐
+│   Provider Implementation       │  ← Provider-specific
+│   (AzureDevOps, GitHub, etc.)   │
+└─────────────────────────────────┘
+```
+
+### Adding a New Provider
+
+To add support for a new provider:
+
+1. Implement `ISourceControlClient` interface
+2. Implement `ICommentService` interface
+3. Implement `IApprovalService` interface
+4. Register in `Program.cs` dependency injection
+5. Done!
+
+See **[REFACTORING.md](REFACTORING.md)** for detailed instructions.
+
+### Selecting a Provider
+
+**Default (Azure DevOps):**
 ```bash
-# Use a more cost-effective model
-export AI_FOUNDRY_DEPLOYMENT="gpt-35-turbo"
+dotnet run --env .env
 ```
 
-### 3. Enable Dry Run for Testing
+**Explicit Selection:**
 ```bash
-# Test configuration without posting to Azure DevOps
-export DRY_RUN=true
+# Via environment variable
+export SOURCE_PROVIDER=AzureDevOps
+dotnet run --env .env
+
+# Or in settings.ini:
+[Provider]
+SourceProvider = AzureDevOps
 ```
 
-### 4. Monitor Token Usage
+## 🚀 Deployment Options
 
-The bot logs token usage for each file review:
-```
-Token usage - Input: 1500, Output: 300, Total: 1800
-```
-
-Use these logs to:
-- Identify expensive reviews
-- Optimize your policy file
-- Adjust `MAX_PROMPT_DIFF_BYTES` to reduce input tokens
-
-## Troubleshooting
-
-### Common Issues
-
-**"Policy file not found"**
-- Ensure `POLICY_PATH` points to an existing markdown file
-- Use absolute path or path relative to working directory
-
-**"Failed to authenticate with Azure DevOps"**
-- Verify `ADO_ACCESS_TOKEN` has Code (Read & Write) permissions
-- Check token hasn't expired
-- Ensure token has access to the specified project/repository
-
-**"AI review failed"**
-- Verify `AI_FOUNDRY_ENDPOINT` and `AI_FOUNDRY_API_KEY` are correct
-- Check that `AI_FOUNDRY_DEPLOYMENT` matches your Azure OpenAI deployment name
-- Ensure your API key has sufficient quota
-
-**"Too many files to review"**
-- Increase `MAX_FILES_TO_REVIEW` if you need to review more files
-- Or split large PRs into smaller, focused changes
-
-**"Comments not appearing in PR"**
-- Check `DRY_RUN` is set to `false`
-- Verify the bot's PAT has permissions to post comments
-- Review logs for any API errors
-
-### Debug Logging
-
-For more detailed logs, review the console output. The bot logs:
-- Files being reviewed (with sizes)
-- Token usage per file
-- Issues found
-- When limits are exceeded
-- Approval decisions
-
-## Azure Pipeline Integration
-
-### Required Pipeline Variables
-
-Configure these as pipeline variables (can be secret):
-
-| Variable | Type | Description |
-|----------|------|-------------|
-| `AIREVIEWER_REPO_URL` | String | Git URL to clone AIReviewer from |
-| `ENV_FILE_CONTENT` | Secret | Contents of .env file with AI credentials |
-
-### Pipeline Environment Variables
-
-These are automatically set by Azure Pipelines:
-- `System.AccessToken`: Automatically injected as `ADO_ACCESS_TOKEN`
-- `System.CollectionUri`: Used for `ADO_COLLECTION_URL`
-- `System.TeamProject`: Used for `ADO_PROJECT`
-- `Build.Repository.ID`: Used for `ADO_REPO_ID`
-- `System.PullRequest.PullRequestId`: Used for `ADO_PR_ID`
-
-### Example .env File Content
-
-Store in `ENV_FILE_CONTENT` pipeline variable:
-```
-AI_FOUNDRY_ENDPOINT=https://your-endpoint.openai.azure.com
-AI_FOUNDRY_API_KEY=your-api-key-here
-AI_FOUNDRY_DEPLOYMENT=gpt-4o
-POLICY_PATH=./policy/review-policy.md
-MAX_FILES_TO_REVIEW=50
-MAX_ISSUES_PER_FILE=5
+### Option 1: Run Locally (Development)
+```bash
+dotnet run --env .env
 ```
 
-## License
+### Option 2: Azure Container Instance
+```bash
+docker build -t Quaally .
+docker run -e ServiceBusConnectionString="..." Quaally
+```
+
+### Option 3: Azure App Service
+Deploy as a worker process (no HTTP endpoints needed)
+
+### Option 4: Self-Hosted Server
+Run as systemd service (Linux) or Windows Service
+
+## 🔄 Migration from Pipeline-Based
+
+If you're migrating from the old pipeline-based system:
+
+1. ✅ Complete queue setup (see QUEUE_SETUP_GUIDE.md)
+2. ✅ Update .env with ServiceBusConnectionString
+3. ✅ Add [Queue] section to settings.ini
+4. ✅ Remove old Azure Pipeline trigger (optional - can coexist)
+5. ✅ Test with @mentions in PR comments
+
+The old pipeline-based approach still works, but the queue-based system offers much more flexibility and interactivity.
+
+## 📈 Roadmap
+
+### Multi-Provider Support
+- [x] Core abstraction layer
+- [x] Azure DevOps provider implementation
+- [ ] GitHub provider
+- [ ] GitLab provider
+- [ ] Bitbucket provider
+- [ ] Multi-provider deployments (run multiple providers simultaneously)
+
+### Planned Features
+- [ ] Persistent conversation memory across sessions
+- [ ] Build/test status integration
+- [ ] Code owners awareness
+- [ ] Multi-repository support
+- [ ] Analytics dashboard
+
+### Nice-to-Have
+- [ ] Slack/Teams notifications
+- [ ] Scheduled PR reviews
+- [ ] Custom review templates
+- [ ] Machine learning feedback loop
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Check existing issues or create a new one
+2. Fork the repository
+3. Create a feature branch
+4. Make your changes with tests
+5. Submit a pull request
+
+## 📄 License
 
 [Your License Here]
 
-## Support
+## 💬 Support
 
-For issues, questions, or contributions, please [open an issue](your-repo-url/issues) or contact your team.
+- **Documentation**: See [QUEUE_SETUP_GUIDE.md](QUEUE_SETUP_GUIDE.md) and [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Issues**: [Open an issue](your-repo-url/issues)
+- **Questions**: [Discussions](your-repo-url/discussions)
+
+---
+
+**Happy Reviewing!** 🎉
+
+Built with ❤️ using Azure OpenAI, Azure Service Bus, and .NET 8

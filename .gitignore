@@ -9,7 +9,15 @@
 *.user
 *.userosscache
 *.sln.docstates
+
+# Environment variable files (contains secrets)
 *.env
+!*.env.example
+# Provider-specific environment files
+**/Providers/**/azure.env
+**/Providers/**/github.env
+**/Providers/**/gitlab.env
+**/Providers/**/bitbucket.env
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
